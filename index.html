@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Two Phases 3D</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Martian+Mono:wght@300;500&display=swap">
+<link rel="stylesheet" href="src/style.css">
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
+</script>
+</head>
+<body>
+<canvas id="c" tabindex="0" aria-label="Three-dimensional simulation of a growing network that alternates between collapse and consolidation"></canvas>
+<div id="vig" class="fx"></div>
+<div id="barT" class="bar"></div><div id="barB" class="bar"></div>
+<div id="tl" class="hud"><div class="name">Two Phases</div><div class="phase"><span class="dot" id="dot"></span><span id="ph">dispersal</span></div><div id="cnt">&nbsp;</div></div>
+<div id="bl" class="hud"><label for="rateIn">time</label><input id="rateIn" type="range" min="0" max="1000" step="1" value="881"><output id="rate" for="rateIn">×1.00</output><button id="rate1" type="button" aria-label="Reset time rate to normal speed">1×</button></div>
+<div id="br" class="hud">link and node load<div class="scale"></div><div class="ticks"><span>safe</span><span>loaded</span><span>failing</span></div></div>
+<button id="snd" type="button" aria-pressed="true">Sound on</button>
+<div id="hint"><b>left drag</b> rotate · <b>right drag</b> roll · <b>wheel</b> or <b>pinch</b> zoom · <b>R</b> reset view<br><b>hold middle button</b> or <b>space</b> for slow motion, drag up or down while holding to change it</div>
+<div id="fail" hidden>This view needs WebGL, and it could not start in this browser.</div>
+<script>setTimeout(()=>{if(!window.__tp3d)document.getElementById('fail').hidden=false},9000);</script>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
