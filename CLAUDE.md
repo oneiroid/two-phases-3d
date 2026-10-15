@@ -21,7 +21,7 @@ A 3D port of a 2D canvas piece ("Two Phases"). No framework and no build step fo
 States (`view().state`): 0 growth, 1 collapse (fission chain), 2 dispersal, 3 consolidation.
 
 - Node arrays are preallocated with `NM = 3N` slots. `act[i]` marks live slots, `abs[i] >= 0` marks a node being absorbed by node `abs[i]`.
-- Links are objects in `bonds` with `u = tension / strength` as the load ratio. A link breaks at `u > 1` (tension) or `u < -1.4` (compression).
+- Links are objects in `bonds` with `u = tension / strength` as the load ratio. The load limits are `u > 1` (tension) and `u < -1.4` (compression). In growth an overloaded link yields (its rest length gives way, the load holds at the limit) and never breaks. Collapse starts when at least 10% of links have yielded within 0.5 s and one of them touches a hub. Links break only in collapse and dispersal.
 - In 2D, new links could not cross existing ones (a planar graph). In 3D, `crossesAny(i, j)` rejects a link that passes within `rad(k) + 0.1·SP` of another node, or within `0.16·SP` of an existing link (segment–segment distance). `MAXDEG` (default 6) caps links per node.
 - The container is a sphere of radius `R = cbrt(N·SP³·3/4π)·rs`, with `SP = 100`. During collapse and dispersal the walls switch off ("leak") and nodes beyond `R + 50` are removed.
 - Gravity is scaled by `gs = 0.42` against the 2D constants, because a 3D neighbourhood within the same cutoff holds about 3× more nodes.

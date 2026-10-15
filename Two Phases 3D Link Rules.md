@@ -2,7 +2,7 @@
 
 Oct 15, 2026 · @Alexey Ogibin
 
-Links form only during growth. They tighten as they age, break when their load ratio passes a threshold, and follow different rules during collapse, dispersal and consolidation. All rules below are in `src/sim.js`. Distances use `SP = 100`, and node radius is `rad = 3.5 + 3.6·√m`.
+Links form only during growth. They tighten as they age, yield instead of breaking while the structure grows, and break only in the fast phases, which follow different rules during collapse, dispersal and consolidation. All rules below are in `src/sim.js`. Distances use `SP = 100`, and node radius is `rad = 3.5 + 3.6·√m`.
 
 ## When a link can form
 
@@ -40,24 +40,29 @@ Each link is a spring with tension `T = k·(d − L)·gr`, applied along the lin
 During growth, links become stiffer and shorter over time. This builds stress across the structure until it fails.
 
 - **Stiffness rises with age.** `k = K0·(1 + min(1.4, age/12))`, so a link is 2.4× stiffer after about 17 s.
-- **Rest length shrinks** toward `0.75·gap` at a rate of `0.18·D` per second. `D` rises steadily during growth, and faster at higher levels. Pulling nodes closer than contact distance is what eventually breaks the structure.
+- **Rest length shrinks** toward `0.75·gap` at a rate of `0.18·D` per second. `D` rises steadily during growth, and faster at higher levels. Pulling nodes closer than contact distance is what eventually overloads the structure.
 - **Absorption along links.** If one end is more than 1.8× heavier than the other, the heavy end can absorb the light one. The chance per second is `0.1 + 0.8·su²`, where `su` is the link's smoothed load, so loaded links cause more absorption. At most one absorption starts every 0.25 s across the whole system.
 - **Links push nodes aside.** A node that comes within `rad + 0.16·SP` of a link's segment is pushed off it, and the link's two ends receive the opposite force.
 
-## Breaking
+## Overload and breaking
 
-In growth, a link breaks when `u > 1` (tension) or `u < −1.4` (compression), so it carries 40% more force in compression than in tension. A break has these effects:
+The load limits are `u > 1` (tension) and `u < −1.4` (compression), so a link carries 40% more force in compression than in tension.
 
-- **Recoil.** Both ends get an impulse along the link of `(0.4 + min(2, |u|)) · kick`, divided by √mass. A link that breaks under tension makes its ends fly apart. `kick` is 1.4 in growth and 2.4 in collapse.
+**In growth, links never break.** An overloaded link yields: its rest length gives way just enough to hold the load at the limit, so the link stays red and keeps its stress. The stress is released all at once in the collapse.
+
+- **Collapse trigger.** During growth, once `D > 0.45`, if at least `max(3, 10% of links)` links have yielded within the last 0.5 s and one of them touches a hub, that hub undergoes fission and the collapse phase starts. A hub is a node in about the top 8% by mass with mass of at least 3.5. Without a hub under overload, growth goes on until the overload reaches one, or a node grows heavy enough to start consolidation.
+
+A break, which happens only in collapse and dispersal, has these effects:
+
+- **Recoil.** Both ends get an impulse along the link of `(0.4 + min(2, |u|)) · kick`, divided by √mass. A link that breaks under tension makes its ends fly apart. `kick` is 2.4 in collapse and 1 in dispersal.
 - **Fatigue.** Both endpoints gain `fat += 0.3`, which decays with a time constant of about 0.7 s, and they flash.
-- **Collapse trigger.** The break is recorded. During growth, once `D > 0.45`, if at least `max(3, 5% of links)` breaks happen within 0.5 s and one of them involves a hub, that hub undergoes fission and the collapse phase starts. A hub is a node in about the top 8% by mass with mass of at least 3.5.
 
 ## Collapse, dispersal and consolidation
 
 | Phase | Breaking rule | Other behaviour |
 | --- | --- | --- |
 | Collapse | Effective load is `u / max(0.15, 1 − 0.6·fatigue)`, so tired links break sooner | Each break schedules every link attached to either endpoint to break 0.1 to 0.28 s later with 75% probability, which produces the chain reaction |
-| Dispersal | Thresholds as in growth, plus a 1.5% chance of breaking per 1/60 s | Strength decays as `s·e^(−0.5t)`, so the remaining links fall apart within a few seconds |
+| Dispersal | Breaks at the load limits, plus a 1.5% chance of breaking per 1/60 s | Strength decays as `s·e^(−0.5t)`, so the remaining links fall apart within a few seconds |
 | Consolidation | Links never break | Rest length follows the current distance, clamped to `[0.9·gap, 1.6·SP + radii]`; age resets and stiffness returns to `K0`, so the next level starts with relaxed links |
 
 Every step, a link is removed if either endpoint has been removed or is being absorbed, and duplicate links are dropped.
