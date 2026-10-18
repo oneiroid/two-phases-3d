@@ -6,12 +6,13 @@ import {createSim} from '../src/sim.js';
 const [N = 80, SECS = 480, gs = .42, maxdeg = 6, rs = .8] = process.argv.slice(2).map(Number);
 const S = createSim(N, {}, {gs, maxdeg, rs});
 const NAMES = ['growth', 'collapse', 'dispersal', 'consolidation'];
-let prev = -1;
+let prev = -1, lastDk = 0;
 const count = {collapse: 0, consolidation: 0};
 const t0 = Date.now();
 for (let f = 0; f < 60 * SECS; f++) {
   S.step(1 / 60);
   const v = S.view();
+  if (v.state === 0) lastDk = v.Dk;
   if (v.state !== prev) {
     if (v.state === 1) count.collapse++;
     if (v.state === 3) count.consolidation++;
@@ -22,7 +23,9 @@ for (let f = 0; f < 60 * SECS; f++) {
       if (S.nb[i]) ext = Math.max(ext, Math.hypot(S.px[i] - v.bcx, S.py[i] - v.bcy, S.pz[i] - v.bcz));
     }
     console.log(`${v.T.toFixed(1).padStart(6)}s  ${NAMES[v.state].padEnd(13)} level ${v.level}  nodes ${v.A.length}  links ${v.bonds.length}` +
-      `  mean degree ${(deg / Math.max(1, v.A.length)).toFixed(2)}  max mass ${mx.toFixed(1)}/${v.Mth.toFixed(1)}  extent ${ext.toFixed(0)}`);
+      `  mean degree ${(deg / Math.max(1, v.A.length)).toFixed(2)}  max mass ${mx.toFixed(1)}/${v.Mth.toFixed(1)}  extent ${ext.toFixed(0)}` +
+      (v.state === 1 || v.state === 3 ? `  D at end of growth ${lastDk.toFixed(2)}` : '') +
+      (v.state === 2 ? `  depth ${v.depth.toFixed(2)}` : ''));
     prev = v.state;
   }
 }

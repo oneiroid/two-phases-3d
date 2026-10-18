@@ -7,6 +7,7 @@
   "scripts": {
     "serve": "npx --yes http-server -c-1 -p 8080 .",
     "build": "node scripts/build.mjs",
-    "sim": "node tools/headless-sim.mjs"
+    "sim": "node tools/headless-sim.mjs",
+    "sweep": "node tools/delay-sweep.mjs"
   }
 }

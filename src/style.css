@@ -13,7 +13,7 @@
 }
 [hidden]{display:none!important}
 html,body{height:100%;margin:0;background:var(--void);color:var(--ink);overflow:hidden;overscroll-behavior:none}
-canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;outline:none}
+#c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;outline:none}
 .fx{position:fixed;inset:0;pointer-events:none}
 #vig{background:radial-gradient(ellipse at center,rgba(0,0,0,0) 45%,rgba(0,0,0,.75) 100%);opacity:0}
 .bar{position:fixed;left:0;right:0;height:7vh;background:#000;pointer-events:none;transform:scaleY(0)}
@@ -24,6 +24,21 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
 #tl .name{font-weight:500;font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--ink-dim)}
 #tl .phase{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink);font-weight:500;letter-spacing:.06em;margin-top:2px}
 #tl .dot{width:7px;height:7px;border-radius:50%;background:var(--safe);box-shadow:0 0 8px currentColor;transition:background .3s,color .3s}
+/* self-regulation readout: D = k·τ against the π/2 stability limit, and the load next to the delayed load the structure acts on */
+#fb{margin-top:12px;width:170px;white-space:nowrap;transition:opacity .6s}
+#fb.off{opacity:.35}
+#fb .fbrow{display:flex;justify-content:space-between;font-size:9px;letter-spacing:.12em;text-transform:uppercase}
+#fbD{color:var(--ink);letter-spacing:.04em;text-transform:none;font-weight:500}
+#fb .fbbar{position:relative;height:3px;margin:5px 0 7px;border-radius:2px;background:rgba(120,145,175,.22)}
+#fbFill{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:2px;background:var(--safe);transition:background .4s}
+/* the tick sits at π/2 on a 0 to 2.5 scale */
+#fb .fbbar b{position:absolute;left:62.8%;top:-3px;width:1px;height:9px;background:var(--ink-dim)}
+#fbPlot{display:block;width:170px;height:40px}
+#fb .fbkey{display:flex;gap:10px;font-size:9px;letter-spacing:.06em;margin-top:3px}
+#fb .k1::before,#fb .k2::before{content:"";display:inline-block;width:10px;height:2px;margin-right:5px;vertical-align:middle;border-radius:1px}
+#fb .k1::before{background:var(--loaded)}
+#fb .k2::before{background:var(--hub)}
+#ph{transition:opacity .35s}
 #bl{bottom:calc(12px + env(safe-area-inset-bottom,0px));left:max(16px,env(safe-area-inset-left,0px));display:flex;align-items:center;gap:10px;pointer-events:auto}
 #bl label{cursor:pointer}
 #rateIn{-webkit-appearance:none;appearance:none;width:160px;height:20px;margin:0;background:transparent;cursor:pointer}
@@ -49,5 +64,5 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:
   font:300 11px/1.7 var(--mono);letter-spacing:.04em;color:var(--ink-dim);pointer-events:none;transition:opacity 1.2s}
 #hint b{color:var(--ink);font-weight:500}
 #fail{position:fixed;inset:0;display:grid;place-items:center;padding-inline:max(16px,env(safe-area-inset-left,0px));font:300 12px/1.7 var(--mono);color:var(--ink);text-align:center}
-@media (max-width:520px){#br{display:none}#rateIn{width:110px}#hint{bottom:calc(48px + env(safe-area-inset-bottom,0px))}}
+@media (max-width:520px){#br{display:none}#fbPlot,#fb .fbkey{display:none}#rateIn{width:110px}#hint{bottom:calc(48px + env(safe-area-inset-bottom,0px))}}
 @media (prefers-reduced-motion:reduce){#hint{transition:none}}

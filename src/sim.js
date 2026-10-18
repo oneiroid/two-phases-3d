@@ -4,6 +4,9 @@ export function createSim(N, hooks, opt){
   opt=opt||{};
   const H=hooks||{};const call=(k,...a)=>{if(H[k])H[k](...a)};
   const NM=N*3,K0=.1,SP=100,GS=opt.gs??.42,MAXDEG=opt.maxdeg??6;
+  // self-regulation with a delayed load signal (Deus ex Futuro, "the two-phase law"): the delay grows with the structure's
+  // complexity, and a new level runs faster and regulates with a proportionally shorter delay
+  const TAU0=opt.tau0??.45,GAM=opt.gam??1.3,KG=opt.kg??15,SIG0=.5;
   const R=Math.cbrt(N*SP*SP*SP*3/(4*Math.PI))*(opt.rs??.8);
   const rnd=Math.random,cl=(v,a,b)=>v<a?a:v>b?b:v,sstep=t=>t<=0?0:t>=1?1:t*t*(3-2*t);
   const F=()=>new Float32Array(NM);
@@ -12,7 +15,9 @@ export function createSim(N, hooks, opt){
   const nb=new Uint8Array(NM),act=new Uint8Array(NM),arr=new Uint8Array(NM),lv=new Uint8Array(NM),abs=new Int16Array(NM).fill(-1);
   let A=[],bonds=[],pend=[];const bset=new Set();
   let state=2,D=0,heat=.8,level=0,fastCount=0,fT=0,T=0,hubLinked=false,Mth0=N*.3,Mth=Mth0,quiet=0,bifEnd=-1,sigma=0,
-    bcx=0,bcy=0,bcz=0,nBound=0,lastAbs=0,ev=null;
+    bcx=0,bcy=0,bcz=0,nBound=0,lastAbs=0,ev=null,
+    brake=0,Deff=0,sigQ=0,tauD=0,kG=0,sigHat=0,col0=0,colBroken=0,hm0=0,depth=0;
+  const hist=[],hitTried=new Set();
   const snaps=[],shocks=[],cool=new Map(),nextEat=new Map();
   const key=(a,b)=>a<b?a*4096+b:b*4096+a;
   const rad=i=>3.5+3.6*Math.sqrt(m[i]);
@@ -52,7 +57,7 @@ export function createSim(N, hooks, opt){
   function strength(a,b,L){return K0*L*.22*(.6+.8*rnd())*(1+.06*(Math.min(m[a],m[b])-1))}
   function addBond(i,j,L){
     const q=ru();
-    const bd={a:i,b:j,L,k:K0,s:strength(i,j,L),age:0,u:0,T:0,su:0,sw:0,qx:q[0],qy:q[1],qz:q[2],dead:0,pend:0,gr:1,yt:-9};
+    const bd={a:i,b:j,L,L0:L,k:K0,s:strength(i,j,L),age:0,u:0,T:0,su:0,sw:0,qx:q[0],qy:q[1],qz:q[2],dead:0,pend:0,gr:1,yt:-9};
     if(state===0)call('pluck',L);
     bonds.push(bd);bset.add(key(i,j));nb[i]++;nb[j]++;return bd;
   }
@@ -63,8 +68,8 @@ export function createSim(N, hooks, opt){
     vx[a]-=ux*ia;vy[a]-=uy*ia;vz[a]-=uz*ia;vx[b]+=ux*ib;vy[b]+=uy*ib;vz[b]+=uz*ib;
     snaps.push({a,b,l:d,life:1,w:.9+6.5*Math.min(1.3,Math.abs(bd.u))});
     fat[a]+=.3;fat[b]+=.3;zap[a]=Math.max(zap[a],.7);zap[b]=Math.max(zap[b],.7);
-    if(state===1){heat+=.01;
-      for(const o of bonds)if(!o.dead&&!o.pend&&(o.a===a||o.b===a||o.a===b||o.b===b)&&rnd()<.75){o.pend=T+.1+.18*rnd();pend.push(o)}}
+    if(state===1){heat+=.01;colBroken++;
+      for(const o of bonds)if(!o.dead&&!o.pend&&(o.a===a||o.b===a||o.a===b||o.b===b)&&rnd()<.04+.9*Math.min(1,o.su*o.su*1.2)){o.pend=T+.1+.18*rnd();pend.push(o)}}
     call('tick',state,(px[a]+px[b])/2,(py[a]+py[b])/2,(pz[a]+pz[b])/2);
   }
 
@@ -107,9 +112,12 @@ export function createSim(N, hooks, opt){
     for(const b of over)for(const i of [b.a,b.b])if(act[i]&&m[i]>=hubM&&(hit<0||m[i]>m[hit]))hit=i;
     if(hit>=0){fastCount++;collapse(hit)}
   }
-  function collapse(hit){state=1;fT=0;pend=[];ev={k:'collapse',t:T};if(hit>=0)fission(hit)}
+  const heavyMass=()=>{let s=0;for(const i of A)if(act[i]&&m[i]>=2.5)s+=m[i];return s};
+  function collapse(hit){state=1;fT=0;pend=[];col0=bonds.length;colBroken=0;hm0=heavyMass();hitTried.clear();ev={k:'collapse',t:T,x:px[hit]||0,y:py[hit]||0,z:pz[hit]||0};if(hit>=0)fission(hit)}
+  // a revolution falls back to the start of its own slow phase; a deep one, which splits most of the heavy structure, also loses levels
   function disperse(){
-    state=2;heat=Math.max(heat,.6);level=0;Mth=Mth0;lv.fill(0);ev={k:'disperse',t:T};
+    depth=hm0?cl(1-heavyMass()/hm0,0,1):1;const lost=depth>.75?level:depth>.45?1:0;
+    state=2;heat=Math.max(heat,.6);level=Math.max(0,level-lost);Mth=Mth0;for(const i of A)lv[i]=Math.min(lv[i],level);ev={k:'disperse',t:T,depth,lost};
     for(const o of bonds)o.pend=0;pend=[];for(const i of A)fis[i]=0;
   }
   function bifurcate(){state=3;fT=0;quiet=0;bifEnd=-1;hubLinked=false;fastCount++;ev={k:'bifurcate',t:T};call('bif')}
@@ -125,7 +133,7 @@ export function createSim(N, hooks, opt){
   /* ---------- physics ---------- */
   function forces(h){
     for(const i of A){fx[i]=0;fy[i]=0;fz[i]=0}
-    const amp=.012+heat*.35,famp=state===2?.1*heat:.01,G=(state===1?.3:state===2?.4:2+70*D*D)*GS,Rg=SP*2.4,s2=SP*SP*.3;
+    const amp=.012+heat*.35,famp=state===2?.1*heat:.01,G=(state===1?.3+(2+70*Deff*Deff)*Math.max(0,1-1.6*colBroken/(col0||1)):state===2?.4:2+70*Deff*Deff)*GS,Rg=SP*2.4,s2=SP*SP*.3;
     const leak=(state===1||state===2)&&A.length>N,M=30;
     for(const i of A){if(abs[i]>=0)continue;
       const sm=Math.sqrt(m[i]);
@@ -159,7 +167,7 @@ export function createSim(N, hooks, opt){
       bd.T=Tn;bd.u=Tn/bd.s;fx[a]+=dx*f;fy[a]+=dy*f;fz[a]+=dz*f;fx[b]-=dx*f;fy[b]-=dy*f;fz[b]-=dz*f}
     for(const i of A){
       if(abs[i]>=0){const a=abs[i],e=1-sstep(absT[i]/absD[i]);px[i]=px[a]+offx[i]*e;py[i]=py[a]+offy[i]*e;pz[i]=pz[a]+offz[i]*e;vx[i]=vx[a];vy[i]=vy[a];vz[i]=vz[a];continue}
-      const dm=Math.pow(state===2?.975+.015*Math.min(1,heat):state===1?.99:(nb[i]>0?.93:.975),h);
+      const dm=Math.pow(state===2?.975+.015*Math.min(1,heat):state===1?(nb[i]>0?.93:.99):(nb[i]>0?.93:.975),h);
       vx[i]=(vx[i]+fx[i]/m[i]*h)*dm;vy[i]=(vy[i]+fy[i]/m[i]*h)*dm;vz[i]=(vz[i]+fz[i]/m[i]*h)*dm;
       const sp=vx[i]*vx[i]+vy[i]*vy[i]+vz[i]*vz[i];if(sp>324){const s=18/Math.sqrt(sp);vx[i]*=s;vy[i]*=s;vz[i]*=s}
       px[i]+=vx[i]*h;py[i]+=vy[i]*h;pz[i]+=vz[i]*h;
@@ -186,7 +194,8 @@ export function createSim(N, hooks, opt){
     for(const bd of bonds){if(bd.dead)continue;const a=bd.a,b=bd.b,u=bd.u;
       if(state===0){
         bd.age+=dt;bd.k=K0*(1+Math.min(1.4,bd.age/12));
-        const Lm=gap(a,b)*.75;bd.L=Math.max(Lm,bd.L-(bd.L-Lm)*.18*D*dt);
+        const Lm=gap(a,b)*.75,c=.18*D*(1-2*brake);
+        bd.L=c>=0?Math.max(Lm,bd.L-(bd.L-Lm)*c*dt):bd.L+(Math.max(bd.L0,Lm)-bd.L)*Math.min(1,-c*dt);
         // links never break while the structure grows: an overloaded link yields (its rest length gives way so the load holds at the limit),
         // and the stress it carries waits for the collapse
         if(u>1||u<-1.4){const d=Math.hypot(px[b]-px[a],py[b]-py[a],pz[b]-pz[a]),kg=bd.k*bd.gr||K0;
@@ -196,7 +205,7 @@ export function createSim(N, hooks, opt){
         if(m[hv]>1.8*m[lt]&&T-lastAbs>.25&&rnd()<dt*(.1+.8*bd.su*bd.su)){lastAbs=T;absorb(lt,hv,.35);continue}
       }else if(state===1){
         if(bd.pend&&T>=bd.pend){bd.u=Math.sign(u||1)*Math.max(.8,Math.abs(u));brk(bd,2.4);continue}
-        const ue=u/Math.max(.15,1-.6*Math.min(1,fat[a]+fat[b]));if(ue>1||ue<-1.4){brk(bd,2.4);continue}
+        const ue=u/Math.max(.15,1-.45*Math.min(1,fat[a]+fat[b]));if(ue>1.12||ue<-1.55){brk(bd,1.5);continue}
       }else if(state===3){
         const d=Math.hypot(px[b]-px[a],py[b]-py[a],pz[b]-pz[a]);
         if(bd.gr<1)bd.gr=Math.min(1,bd.gr+dt/.5);else bd.L+=(Math.max(Math.min(d,SP*1.6+rad(a)+rad(b)),gap(a,b)*.9)-bd.L)*Math.min(1,dt*2.5);bd.age=0;bd.k=K0;
@@ -208,6 +217,8 @@ export function createSim(N, hooks, opt){
       if(!act[b.a]||!act[b.b]||abs[b.a]>=0||abs[b.b]>=0||b.a===b.b){unlink(b);return false}
       const k=key(b.a,b.b);if(seen.has(k)){b.dead=1;nb[b.a]--;nb[b.b]--;return false}seen.add(k);return true})}
     sigma=nu?su/nu:0;
+    // the load signal the structure regulates on: the load its most stressed links carry (97th percentile)
+    if(bonds.length){const q=bonds.map(o=>o.su).sort((p,q)=>p-q);sigQ=q[Math.floor(q.length*.97)]}else sigQ=0;
     // new links: two nodes in contact link, unless the link would run through a node or graze another link (a pair that just broke waits 4 s)
     if(state===0&&heat<.35){
       for(let p=0;p<A.length;p++){const i=A[p];if(abs[i]>=0||arr[i]||nb[i]>=MAXDEG)continue;
@@ -220,16 +231,26 @@ export function createSim(N, hooks, opt){
     if(state===0&&A.length<N&&rnd()<dt*(A.length<N*.6?6:1.6))spawnEdge();
     // phases
     if(state===0){
-      D=Math.min(1.6+.2*level,D+dt/24*(1+.4*level));heat-=heat*dt/1.2;
+      // might grows superlinearly, so its relative growth rate rises through the phase
+      const sp=1+.4*level,gr=.083*sp*Math.pow(.35+D,1.5);D=Math.min(3+.3*level,D+gr*dt);heat-=heat*dt/1.2;
+      // the structure brakes its own contraction from the load of its most stressed links, seen tauD late; the regulator's rate k keeps pace with growth,
+      // so D = k·tauD rises with complexity and the loop loses stability near π/2 (Hayes)
+      // complexity = total link stiffness per node: links multiply and harden as they age
+      {let ks=0;for(const o of bonds)ks+=o.k;tauD=TAU0*Math.pow(Math.max(.2,ks/(K0*N*2)),GAM)/sp}
+      kG=KG*gr/(.35+D);
+      hist.push(T,sigQ);while(hist.length>2&&hist[0]<T-12)hist.splice(0,2);
+      {let j=0;while(j+2<hist.length&&hist[j+2]<=T-tauD)j+=2;sigHat=hist[j+1]}
+      brake=cl(brake+dt*kG*(sigHat-SIG0)/SIG0,0,1);
       {let big=-1;for(const i of A)if(abs[i]<0&&m[i]>=Mth&&(big<0||m[i]>m[big]))big=i;if(big>=0)bifurcate()}
       if(state===0&&D>.45){const over=bonds.filter(o=>T-o.yt<.5);if(over.length>=Math.max(3,bonds.length*.1))trigger(over)}
       else if(state===0&&D>9){let mi=-1;for(const i of A)if(mi<0||m[i]>m[mi])mi=i;collapse(mi)}
     }else if(state===1){
       fT+=dt;pend=pend.filter(o=>!o.dead);
-      // fragments that reach a heavy node split it too
-      for(const f of A){if(frag[f]<.2||abs[f]>=0)continue;
+      // a fragment that reaches a heavy node can split it too: surely if the node is loaded, rarely if it is relaxed (one try per pair)
+      for(const f of A){if(frag[f]<.5||abs[f]>=0)continue;
         for(const j of A){if(j===f||m[j]<2.2||fis[j]||frag[j]>.2||abs[j]>=0)continue;
-          if(Math.hypot(px[j]-px[f],py[j]-py[f],pz[j]-pz[f])<gap(f,j)*1.05)fis[j]=T+.08+.14*rnd()}}
+          if(Math.hypot(px[j]-px[f],py[j]-py[f],pz[j]-pz[f])<gap(f,j)*1.05){const kk=key(f,j);if(hitTried.has(kk))continue;hitTried.add(kk);
+            if(rnd()<.04+.9*sig[j]*sig[j])fis[j]=T+.08+.14*rnd()}}}
       for(const i of A)if(fis[i]&&T>=fis[i]&&act[i])fission(i);
       let live=pend.length>0;for(const i of A)if(fis[i])live=true;
       if(!live&&fT>1.5||fT>8)disperse();
@@ -248,11 +269,12 @@ export function createSim(N, hooks, opt){
           let mx=0;for(const i of A)mx=Math.max(mx,m[i]);const tgt=Mth*.45,pw=mx>tgt?Math.log(tgt)/Math.log(mx):1;
           for(const i of A){mT[i]=m[i]>1?Math.pow(m[i],pw):m[i];if(m[i]>2)lv[i]=Math.min(3,lv[i]+1)}}
       }else{const q=Math.min(1,dt*4);for(const i of A)if(mT[i]>0)m[i]+=(mT[i]-m[i])*q;
-        if(fT-bifEnd>.8){for(const i of A){if(mT[i]>0)m[i]=mT[i];mT[i]=0}state=0;D=.15;level++;ev={k:'level',t:T}}}
+        if(fT-bifEnd>.8){for(const i of A){if(mT[i]>0)m[i]=mT[i];mT[i]=0}state=0;D=.15;brake=0;hist.length=0;level++;ev={k:'level',t:T}}}
     }else{
       heat-=heat*dt/3.2;
-      if(heat<.3&&!bonds.length){state=0;D=0;ev={k:'grow',t:T}}
+      if(heat<.3&&!bonds.length){state=0;D=0;brake=0;hist.length=0;ev={k:'grow',t:T}}
     }
+    if(state===0)Deff=D*(1-brake);else if(state===3)Deff=D;   // held through a collapse: the intact part stays bound
     if(state===0){let hot=0;for(const b of bonds)if(Math.abs(b.u)>.75)hot++;if(hot)call('creak',hot)}
     for(const i of A){fat[i]*=Math.exp(-dt*1.5);zap[i]*=Math.exp(-dt*6);frag[i]*=Math.exp(-dt*.6)}
     for(let i=snaps.length-1;i>=0;i--){snaps[i].life-=dt*2.2;if(snaps[i].life<=0||!act[snaps[i].a]||!act[snaps[i].b])snaps.splice(i,1)}
@@ -260,5 +282,6 @@ export function createSim(N, hooks, opt){
   }
 
   return {N,NM,SP,R,K0,px,py,pz,vx,vy,vz,m,sig,fat,zap,frag,abs,absT,absD,nb,act,arr,lv,born,snaps,shocks,rad,reach,step,
-    view:()=>({A,bonds,state,D,heat,level,Mth,T,sigma,bcx,bcy,bcz,nBound,fastCount,ev,pend:pend.length})};
+    view:()=>({A,bonds,state,D,heat,level,Mth,T,sigma,bcx,bcy,bcz,nBound,fastCount,ev,pend:pend.length,
+      brake,Deff,tauD,kG,Dk:kG*tauD,sigHat,sigQ,depth})};
 }

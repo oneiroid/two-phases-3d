@@ -1,6 +1,6 @@
 # Two Phases 3D: Link Rules
 
-Oct 15, 2026 · @Alexey Ogibin
+Oct 18, 2026 · @Alexey Ogibin
 
 Links form only during growth. They tighten as they age, yield instead of breaking while the structure grows, and break only in the fast phases, which follow different rules during collapse, dispersal and consolidation. All rules below are in `src/sim.js`. Distances use `SP = 100`, and node radius is `rad = 3.5 + 3.6·√m`.
 
@@ -40,9 +40,21 @@ Each link is a spring with tension `T = k·(d − L)·gr`, applied along the lin
 During growth, links become stiffer and shorter over time. This builds stress across the structure until it fails.
 
 - **Stiffness rises with age.** `k = K0·(1 + min(1.4, age/12))`, so a link is 2.4× stiffer after about 17 s.
-- **Rest length shrinks** toward `0.75·gap` at a rate of `0.18·D` per second. `D` rises steadily during growth, and faster at higher levels. Pulling nodes closer than contact distance is what eventually overloads the structure.
+- **Rest length shrinks** toward `0.75·gap` at a rate of `0.18·D·(1 − 2·brake)` per second. The drive `D` (the structure's might) grows superlinearly, `dD/dt = 0.083·(1 + 0.4·level)·(0.35 + D)^1.5`, and the brake comes from self-regulation (next section). When `brake > 0.5` the rate is negative and links loosen back toward their length at birth. Pulling nodes closer than contact distance is what eventually overloads the structure.
+- **Gravity** between nodes scales with `2 + 70·Deff²`, where `Deff = D·(1 − brake)`.
 - **Absorption along links.** If one end is more than 1.8× heavier than the other, the heavy end can absorb the light one. The chance per second is `0.1 + 0.8·su²`, where `su` is the link's smoothed load, so loaded links cause more absorption. At most one absorption starts every 0.25 s across the whole system.
 - **Links push nodes aside.** A node that comes within `rad + 0.16·SP` of a link's segment is pushed off it, and the link's two ends receive the opposite force.
+
+## Self-regulation with a delayed signal
+
+This section follows the two-phase law of *Deus ex Futuro: Core Beliefs and the Dynamics of Transition* (§3, §4, §8). The structure brakes its own contraction from its load, but it sees that load late.
+
+- **Signal.** The 97th percentile of the smoothed link load `su`, so the regulator watches the most stressed links.
+- **Delay.** The brake reads the signal as it was `tauD` seconds ago: `tauD = 0.45 · (Σk / (2·K0·N))^1.3 / (1 + 0.4·level)`. Total link stiffness stands for complexity: links multiply and harden with age, so the delay grows through a phase. A new level runs faster and regulates with a proportionally shorter delay.
+- **Brake.** `d(brake)/dt = k · (signal(t − tauD) − 0.5) / 0.5`, clamped to `[0, 1]`. The regulator's rate `k = 15 · (dD/dt) / (0.35 + D)` keeps pace with the relative growth rate of the drive.
+- **Indicator.** `D_reg = k · tauD`. For the simplest delayed negative feedback, regulation is stable only while `D_reg < π/2` (Hayes). The HUD shows `D_reg` against that limit, with a 20 s trace of the load and of the delayed load the brake acts on.
+
+In practice the regulator holds the load early in a phase. As `D_reg` rises, the brake swings between off and full on with growing amplitude, and the overshoots cause the yields that trigger a collapse.
 
 ## Overload and breaking
 
@@ -54,18 +66,20 @@ The load limits are `u > 1` (tension) and `u < −1.4` (compression), so a link 
 
 A break, which happens only in collapse and dispersal, has these effects:
 
-- **Recoil.** Both ends get an impulse along the link of `(0.4 + min(2, |u|)) · kick`, divided by √mass. A link that breaks under tension makes its ends fly apart. `kick` is 2.4 in collapse and 1 in dispersal.
+- **Recoil.** Both ends get an impulse along the link of `(0.4 + min(2, |u|)) · kick`, divided by √mass. A link that breaks under tension makes its ends fly apart. `kick` is 2.4 for links of a splitting hub and for links the crack reaches, 1.5 for links that fail on their own in collapse, and 1 in dispersal.
 - **Fatigue.** Both endpoints gain `fat += 0.3`, which decays with a time constant of about 0.7 s, and they flash.
 
 ## Collapse, dispersal and consolidation
 
 | Phase | Breaking rule | Other behaviour |
 | --- | --- | --- |
-| Collapse | Effective load is `u / max(0.15, 1 − 0.6·fatigue)`, so tired links break sooner | Each break schedules every link attached to either endpoint to break 0.1 to 0.28 s later with 75% probability, which produces the chain reaction |
+| Collapse | A link fails on its own when its effective load `u / max(0.15, 1 − 0.45·fatigue)` passes 1.12 (or −1.55), so a link that only yielded waits for the crack | The crack: each break schedules each link attached to either endpoint to break 0.1 to 0.28 s later with probability `0.04 + 0.9·min(1, 1.2·su²)`, so it runs through loaded links and stops in relaxed ones. Gravity keeps binding the intact part in proportion to the share of links still unbroken. A fragment that touches a heavy node splits it with probability `0.04 + 0.9·sig²` (one try per pair) |
 | Dispersal | Breaks at the load limits, plus a 1.5% chance of breaking per 1/60 s | Strength decays as `s·e^(−0.5t)`, so the remaining links fall apart within a few seconds |
 | Consolidation | Links never break | Rest length follows the current distance, clamped to `[0.9·gap, 1.6·SP + radii]`; age resets and stiffness returns to `K0`, so the next level starts with relaxed links |
 
 Every step, a link is removed if either endpoint has been removed or is being absorbed, and duplicate links are dropped.
+
+**Depth of a revolution.** When the collapse ends, its depth is the share of heavy mass (nodes of mass ≥ 2.5) that was split. A shallow revolution (depth ≤ 0.45) falls back to the start of its own slow phase and keeps its level. A depth up to 0.75 loses one level, and a deeper one returns to level 0.
 
 ## Differences from the 2D version
 
