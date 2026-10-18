@@ -56,6 +56,22 @@ This section follows the two-phase law of *Deus ex Futuro: Core Beliefs and the 
 
 In practice the regulator holds the load early in a phase. As `D_reg` rises, the brake swings between off and full on with growing amplitude, and the overshoots cause the yields that trigger a collapse.
 
+**Delay test** (`npm run sweep`, N = 80, five runs of 600 s per row, 129 to 147 phase endings per row, so each share is good to about ±0.04):
+
+| Base delay `tau0` (s) | Mean `D_reg` when growth ended | Share of phases ending in collapse |
+| --- | --- | --- |
+| no regulation | – | 0.48 |
+| 0.02 | 0.06 | 0.24 |
+| 0.1 | 0.3 | 0.31 |
+| 0.2 | 0.6 | 0.31 |
+| 0.3 | 0.9 | 0.37 |
+| 0.45 (default) | 1.3 | 0.40 |
+| 0.7 | 2.0 | 0.40 |
+| 1 | 2.8 | 0.40 |
+| 2 | 5.2 | 0.38 |
+
+The collapse share rises with the delay and levels off at about 0.40 once `D_reg` passes about 1, near the π/2 limit. Even the slowest regulator does better than none, because the brake still damps the largest overshoots. Collapses end growth at a higher `D_reg` than consolidations at every delay, by a factor of about 1.4.
+
 ## Overload and breaking
 
 The load limits are `u > 1` (tension) and `u < −1.4` (compression), so a link carries 40% more force in compression than in tension.
