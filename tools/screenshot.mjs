@@ -13,7 +13,7 @@
 import {createRequire} from 'node:module';
 import {createServer} from 'node:http';
 import {readFile} from 'node:fs/promises';
-import {join, extname, dirname} from 'node:path';
+import {join, extname, dirname, sep} from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 const {chromium} = createRequire(import.meta.url)('playwright');
@@ -22,9 +22,10 @@ const types = {'.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css
 const server = createServer(async (req, res) => {
   try {
     const p = join(root, decodeURIComponent(new URL(req.url, 'http://x').pathname));
-    if (!p.startsWith(root)) throw 0;
+    if (!p.startsWith(root + sep)) throw 0;
+    const body = await readFile(p);
     res.writeHead(200, {'content-type': types[extname(p)] || 'application/octet-stream'});
-    res.end(await readFile(p));
+    res.end(body);
   } catch { res.writeHead(404);res.end() }
 }).listen(0);
 const port = server.address().port;

@@ -133,7 +133,8 @@ export function createSim(N, hooks, opt){
   /* ---------- physics ---------- */
   function forces(h){
     for(const i of A){fx[i]=0;fy[i]=0;fz[i]=0}
-    const amp=.012+heat*.35,famp=state===2?.1*heat:.01,G=(state===1?.3+(2+70*Deff*Deff)*Math.max(0,1-1.6*colBroken/(col0||1)):state===2?.4:2+70*Deff*Deff)*GS,Rg=SP*2.4,s2=SP*SP*.3;
+    const amp=.012+heat*.35,famp=state===2?.1*heat:.01,G=(state===1?.3+(2+70*Deff*Deff)*Math.max(0,1-1.6*colBroken/(col0||1)):state===2?.4:2+70*Deff*Deff)*GS,Gf=.3*GS,   // in a collapse only linked pairs keep the growth binding
+      Rg=SP*2.4,s2=SP*SP*.3;
     const leak=(state===1||state===2)&&A.length>N,M=30;
     for(const i of A){if(abs[i]>=0)continue;
       const sm=Math.sqrt(m[i]);
@@ -153,7 +154,7 @@ export function createSim(N, hooks, opt){
         const dx=px[j]-px[i],dy=py[j]-py[i],dz=pz[j]-pz[i],d2=dx*dx+dy*dy+dz*dz;if(d2>Rg*Rg)continue;
         const d=Math.sqrt(d2)||.01,rr=gap(i,j);let f=0;
         if(d<rr)f-=(rr-d)*.25*(m[i]*m[j])/(m[i]+m[j]);
-        f+=G*m[i]*m[j]/(d2+s2)*(1-d/Rg)*1.5;f/=d;
+        f+=(state===1&&!(nb[i]&&nb[j])?Gf:G)*m[i]*m[j]/(d2+s2)*(1-d/Rg)*1.5;f/=d;
         fx[i]+=dx*f;fy[i]+=dy*f;fz[i]+=dz*f;fx[j]-=dx*f;fy[j]-=dy*f;fz[j]-=dz*f;
       }}
     // links push nodes out of their way, so a link never runs through a node
@@ -195,7 +196,7 @@ export function createSim(N, hooks, opt){
       if(state===0){
         bd.age+=dt;bd.k=K0*(1+Math.min(1.4,bd.age/12));
         const Lm=gap(a,b)*.75,c=.18*D*(1-2*brake);
-        bd.L=c>=0?Math.max(Lm,bd.L-(bd.L-Lm)*c*dt):bd.L+(Math.max(bd.L0,Lm)-bd.L)*Math.min(1,-c*dt);
+        bd.L=c>=0?Math.max(Lm,bd.L-(bd.L-Lm)*c*dt):Math.max(bd.L,bd.L+(Math.max(bd.L0,Lm)-bd.L)*Math.min(1,-c*dt));   // loosening only lengthens
         // links never break while the structure grows: an overloaded link yields (its rest length gives way so the load holds at the limit),
         // and the stress it carries waits for the collapse
         if(u>1||u<-1.4){const d=Math.hypot(px[b]-px[a],py[b]-py[a],pz[b]-pz[a]),kg=bd.k*bd.gr||K0;
@@ -218,7 +219,7 @@ export function createSim(N, hooks, opt){
       const k=key(b.a,b.b);if(seen.has(k)){b.dead=1;nb[b.a]--;nb[b.b]--;return false}seen.add(k);return true})}
     sigma=nu?su/nu:0;
     // the load signal the structure regulates on: the load its most stressed links carry (97th percentile)
-    if(bonds.length){const q=bonds.map(o=>o.su).sort((p,q)=>p-q);sigQ=q[Math.floor(q.length*.97)]}else sigQ=0;
+    if(state===0&&bonds.length){const q=bonds.map(o=>o.su).sort((p,q)=>p-q);sigQ=q[Math.floor(q.length*.97)]}else if(state!==1)sigQ=0;
     // new links: two nodes in contact link, unless the link would run through a node or graze another link (a pair that just broke waits 4 s)
     if(state===0&&heat<.35){
       for(let p=0;p<A.length;p++){const i=A[p];if(abs[i]>=0||arr[i]||nb[i]>=MAXDEG)continue;
@@ -244,7 +245,7 @@ export function createSim(N, hooks, opt){
       {let big=-1;for(const i of A)if(abs[i]<0&&m[i]>=Mth&&(big<0||m[i]>m[big]))big=i;if(big>=0)bifurcate()}
       if(state===0&&D>.45){const over=bonds.filter(o=>T-o.yt<.5);if(over.length>=Math.max(3,bonds.length*.1))trigger(over)}
       // safety net: a slow phase that neither tears nor consolidates within 80 s ends at its heaviest node (does not happen in normal runs)
-      else if(state===0&&T-gT>80){let mi=-1;for(const i of A)if(abs[i]<0&&(mi<0||m[i]>m[mi]))mi=i;if(mi>=0)collapse(mi)}
+      if(state===0&&T-gT>80){let mi=-1;for(const i of A)if(abs[i]<0&&(mi<0||m[i]>m[mi]))mi=i;if(mi>=0)collapse(mi)}
     }else if(state===1){
       fT+=dt;pend=pend.filter(o=>!o.dead);
       // a fragment that reaches a heavy node can split it too: surely if the node is loaded, rarely if it is relaxed (one try per pair)
@@ -284,5 +285,5 @@ export function createSim(N, hooks, opt){
 
   return {N,NM,SP,R,K0,px,py,pz,vx,vy,vz,m,sig,fat,zap,frag,abs,absT,absD,nb,act,arr,lv,born,snaps,shocks,rad,reach,step,
     view:()=>({A,bonds,state,D,heat,level,Mth,T,sigma,bcx,bcy,bcz,nBound,ev,pend:pend.length,
-      brake,Deff,tauD,kG,Dk:kG*tauD,sigHat,sigQ,depth})};
+      brake,Deff,tauD,kG,Dk:kG*tauD,sigHat,sigQ,sig0:SIG0,depth})};
 }

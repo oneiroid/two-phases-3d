@@ -40,7 +40,7 @@ Each link is a spring with tension `T = k·(d − L)·gr`, applied along the lin
 During growth, links become stiffer and shorter over time. This builds stress across the structure until it fails.
 
 - **Stiffness rises with age.** `k = K0·(1 + min(1.4, age/12))`, so a link is 2.4× stiffer after about 17 s.
-- **Rest length shrinks** toward `0.75·gap` at a rate of `0.18·D·(1 − 2·brake)` per second. The drive `D` (the structure's might) grows superlinearly, `dD/dt = 0.083·(1 + 0.4·level)·(0.35 + D)^1.5`, and the brake comes from self-regulation (next section). When `brake > 0.5` the rate is negative and links loosen back toward their length at birth. Pulling nodes closer than contact distance is what eventually overloads the structure.
+- **Rest length shrinks** toward `0.75·gap` at a rate of `0.18·D·(1 − 2·brake)` per second. The drive `D` (the structure's might) grows superlinearly, `dD/dt = 0.083·(1 + 0.4·level)·(0.35 + D)^1.5`, and the brake comes from self-regulation (next section). When `brake > 0.5` the rate is negative and links loosen back toward their length at birth (loosening only lengthens a link, never shortens one that yielded longer). Pulling nodes closer than contact distance is what eventually overloads the structure.
 - **Gravity** between nodes scales with `2 + 70·Deff²`, where `Deff = D·(1 − brake)`.
 - **Absorption along links.** If one end is more than 1.8× heavier than the other, the heavy end can absorb the light one. The chance per second is `0.1 + 0.8·su²`, where `su` is the link's smoothed load, so loaded links cause more absorption. At most one absorption starts every 0.25 s across the whole system.
 - **Links push nodes aside.** A node that comes within `rad + 0.16·SP` of a link's segment is pushed off it, and the link's two ends receive the opposite force.
@@ -89,7 +89,7 @@ A break, which happens only in collapse and dispersal, has these effects:
 
 | Phase | Breaking rule | Other behaviour |
 | --- | --- | --- |
-| Collapse | A link fails on its own when its effective load `u / max(0.15, 1 − 0.45·fatigue)` passes 1.12 (or −1.55), so a link that only yielded waits for the crack | The crack: each break schedules each link attached to either endpoint to break 0.1 to 0.28 s later with probability `0.04 + 0.9·min(1, 1.2·su²)`, so it runs through loaded links and stops in relaxed ones. Gravity keeps binding the intact part in proportion to the share of links still unbroken. A fragment that touches a heavy node splits it with probability `0.04 + 0.9·sig²` (one try per pair) |
+| Collapse | A link fails on its own when its effective load `u / max(0.15, 1 − 0.45·fatigue)` passes 1.12 (or −1.55), so a link that only yielded waits for the crack | The crack: each break schedules each link attached to either endpoint to break 0.1 to 0.28 s later with probability `0.04 + 0.9·min(1, 1.2·su²)`, so it runs through loaded links and stops in relaxed ones. Pairs of nodes that both still have links keep the growth gravity, scaled down as links break; free nodes and fragments feel only the weak collapse gravity. A fragment that touches a heavy node splits it with probability `0.04 + 0.9·sig²` (one try per pair) |
 | Dispersal | Breaks at the load limits, plus a 1.5% chance of breaking per 1/60 s | Strength decays as `s·e^(−0.5t)`, so the remaining links fall apart within a few seconds |
 | Consolidation | Links never break | Rest length follows the current distance, clamped to `[0.9·gap, 1.6·SP + radii]`; age resets and stiffness returns to `K0`, so the next level starts with relaxed links |
 

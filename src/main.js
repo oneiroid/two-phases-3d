@@ -237,7 +237,8 @@ function rb(ax,ay,az,bx,by,bz,cx,cy,cz,w,c,a){if(nr>=RB)return;const k=nr++,o=k*
 function line(ax,ay,az,bx,by,bz,w,c,a){rb(ax,ay,az,bx,by,bz,(ax+bx)/2,(ay+by)/2,(az+bz)/2,w,c,a)}
 // a sphere seen from outside is a circle: reach, fission fronts and the load signal are drawn as camera-facing rings
 // (th = line thickness in world units, plus a wide faint halo when glow > 0)
-function ring(x,y,z,r,c,a,th,glow){if(r<1||a<.003)return;bb(x,y,z,r,c,a,2,Math.min(.5,th/r));if(glow)bb(x,y,z,r,c,a*glow,2,Math.min(.5,th*7/r))}
+// the billboard's band is centred at size·(1 − w) with half-width size·w, so size = r + h and w = h / size put it on r
+function ring(x,y,z,r,c,a,th,glow){if(r<1||a<.003)return;const band=(h,al)=>bb(x,y,z,r+h,c,al,2,Math.min(.5,h/(r+h)));band(th/2,a);if(glow)band(th*3,a*glow)}
 
 function fill(es){
   const v=S.view(),A=v.A,{px,py,pz,vx,vy,vz,m,nb,abs,absT,absD,sig,zap,frag,lv,born}=S,D=v.D,T=v.T,st=v.state;
@@ -308,18 +309,19 @@ function hud(v,es){
   vig.style.opacity=es.toFixed(3);barT.style.transform=barB.style.transform=`scaleY(${es.toFixed(3)})`;
   // self-regulation: D = k·tauD on a 0 to 2.5 scale with the π/2 limit marked; the trace keeps 20 s of load and of the load as seen
   const grow=v.state===0;fbEl.classList.toggle('off',!grow);
-  if(grow&&v.T-fbLast>=1/30){fbLast=v.T;fbHist.push(v.T,v.sigQ,v.sigHat);while(fbHist.length>3&&fbHist[0]<v.T-20)fbHist.splice(0,3)}
-  if(!grow&&fbHist.length&&v.state!==1)fbHist.length=0;
+  if(grow&&v.T-fbLast>=1/30){fbLast=v.T;fbHist.push(v.T,v.sigQ,v.sigHat);while(fbHist.length>3&&fbHist[0]<v.T-20)fbHist.splice(0,3);fbDirty=true}
+  if(!grow&&fbHist.length&&v.state!==1){fbHist.length=0;fbDirty=true}
   if(grow)fbDk=v.Dk;const dk=fbDk,dkS=dk.toFixed(2);
   if(dkS!==fbKey){fbKey=dkS;fbD.textContent='D '+dkS;fbFill.style.width=(Math.min(1,dk/2.5)*100).toFixed(1)+'%';
-    fbFill.style.background=dk<1.1?'var(--safe)':dk<Math.PI/2?'var(--loaded)':'var(--fail)';fbTau.textContent=v.tauD.toFixed(1)}
-  if(fbPlot.offsetParent){const W=fbPlot.width,H=fbPlot.height,g=fbG,t1=fbHist.length?fbHist[fbHist.length-3]:0,X=t=>W-(t1-t)/20*W,Y=s=>H-2-Math.min(1,s)*(H-4);
+    fbFill.style.background=dk<1.1?'var(--safe)':dk<Math.PI/2?'var(--loaded)':'var(--fail)'}
+  if(grow){const tk=v.tauD.toFixed(1);if(tk!==fbTauKey){fbTauKey=tk;fbTau.textContent=tk}}
+  if(fbDirty&&fbPlot.offsetParent){fbDirty=false;const SIG0=v.sig0;const W=fbPlot.width,H=fbPlot.height,g=fbG,t1=fbHist.length?fbHist[fbHist.length-3]:0,X=t=>W-(t1-t)/20*W,Y=s=>H-2-Math.min(1,s)*(H-4);
     g.clearRect(0,0,W,H);g.lineWidth=1;g.strokeStyle='rgba(120,145,175,.35)';g.setLineDash([3,4]);g.beginPath();g.moveTo(0,Y(SIG0));g.lineTo(W,Y(SIG0));g.stroke();g.setLineDash([]);
     for(const [o,c] of [[1,'#f5b43c'],[2,'#c8dcff']]){g.strokeStyle=c;g.lineWidth=o===1?2.2:1.6;g.globalAlpha=o===1?.9:.8;g.beginPath();
       for(let j=0;j<fbHist.length;j+=3){const x=X(fbHist[j]),y=Y(fbHist[j+o]);j?g.lineTo(x,y):g.moveTo(x,y)}g.stroke()}g.globalAlpha=1}
 }
-const fbEl=$('fb'),fbD=$('fbD'),fbFill=$('fbFill'),fbTau=$('fbTau'),fbPlot=$('fbPlot'),fbG=fbPlot.getContext('2d'),fbHist=[],SIG0=.5;
-let fbLast=-1,fbKey='',fbDk=0;
+const fbEl=$('fb'),fbD=$('fbD'),fbFill=$('fbFill'),fbTau=$('fbTau'),fbPlot=$('fbPlot'),fbG=fbPlot.getContext('2d'),fbHist=[];
+let fbLast=-1,fbKey='',fbDk=0,fbTauKey='',fbDirty=true;
 
 /* ---------- loop ---------- */
 let last=performance.now(),tsT=1,lastEv=null,cine=0,lastPulse=-9;const focus=new THREE.Vector3();const pulses=[];
