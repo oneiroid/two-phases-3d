@@ -56,21 +56,21 @@ This section follows the two-phase law of *Deus ex Futuro: Core Beliefs and the 
 
 In practice the regulator holds the load early in a phase. As `D_reg` rises, the brake swings between off and full on with growing amplitude, and the overshoots cause the yields that trigger a collapse.
 
-**Delay test** (`npm run sweep`, N = 80, five runs of 600 s per row, 129 to 147 phase endings per row, so each share is good to about ±0.04):
+**Delay test** (`npm run sweep`, N = 80, five runs of 600 s per row, 132 to 146 phase endings per row, so each share is good to about ±0.04):
 
 | Base delay `tau0` (s) | Mean `D_reg` when growth ended | Share of phases ending in collapse |
 | --- | --- | --- |
-| no regulation | – | 0.48 |
-| 0.02 | 0.06 | 0.24 |
-| 0.1 | 0.3 | 0.31 |
-| 0.2 | 0.6 | 0.31 |
-| 0.3 | 0.9 | 0.37 |
-| 0.45 (default) | 1.3 | 0.40 |
-| 0.7 | 2.0 | 0.40 |
-| 1 | 2.8 | 0.40 |
-| 2 | 5.2 | 0.38 |
+| no regulation | – | 0.49 |
+| 0.02 | 0.05 | 0.22 |
+| 0.1 | 0.26 | 0.28 |
+| 0.2 | 0.51 | 0.29 |
+| 0.3 | 0.75 | 0.31 |
+| 0.45 (default) | 1.15 | 0.33 |
+| 0.7 | 1.72 | 0.32 |
+| 1 | 2.5 | 0.38 |
+| 2 | 5.1 | 0.39 |
 
-The collapse share rises with the delay and levels off at about 0.40 once `D_reg` passes about 1, near the π/2 limit. Even the slowest regulator does better than none, because the brake still damps the largest overshoots. Collapses end growth at a higher `D_reg` than consolidations at every delay, by a factor of about 1.4.
+The collapse share rises with the delay, from 0.22 to 0.39, with no sharp break at the π/2 limit. Even the slowest regulator does better than none (0.49), because the brake still damps the largest overshoots. Collapses end growth at a higher `D_reg` than consolidations at every delay, by a factor of about 1.4. An earlier version of the collapse rules (before the review fixes of October 26) gave a curve that levelled off at 0.40 once `D_reg` passed 1; the rise is robust, the plateau was not.
 
 ## Overload and breaking
 
