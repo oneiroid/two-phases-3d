@@ -1,12 +1,13 @@
 {
   "name": "two-phases-3d",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "description": "3D simulation of a stressed network that grows, then collapses in a fission chain or consolidates into hubs.",
   "scripts": {
     "serve": "npx --yes http-server -c-1 -p 8080 .",
     "build": "node scripts/build.mjs",
-    "sim": "node tools/headless-sim.mjs"
+    "sim": "node tools/headless-sim.mjs",
+    "sweep": "node tools/delay-sweep.mjs"
   }
 }

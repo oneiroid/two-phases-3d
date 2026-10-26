@@ -2,8 +2,10 @@
 
 A 3D simulation of a network under load. Nodes link when they touch, links carry force, and the structure alternates between two outcomes:
 
-- **Collapse.** A heavy hub tears, splits into fragments (fission), and the fragments split other heavy nodes in a chain. The structure disperses and growth starts again from level 0.
+- **Collapse.** A heavy hub tears, splits into fragments (fission), and a crack runs through the loaded links while the fragments split other heavy nodes. The structure disperses. A shallow collapse keeps its level, and a deep one falls back by one level or to level 0.
 - **Consolidation.** A node passes the mass threshold, heavy nodes absorb the light nodes within their reach, the surviving hubs link to each other, and their masses are rescaled. The hubs become the units of the next level.
+
+While it grows, the structure regulates its own contraction from its load, which it sees with a delay that lengthens as it grows. The readout under the phase name shows D = k·τ against the π/2 stability limit and a 20 s trace of the load next to the delayed load. This follows the two-phase law in *Deus ex Futuro*.
 
 Colour shows how close a part is to failing: grey-blue is safe, amber is loaded, red is about to break. Link thickness shows the force a link carries. A bowed link is compressed and a sagging one is slack.
 
@@ -38,6 +40,8 @@ On touch screens, one finger rotates and two fingers zoom and twist (roll). Slow
 ```
 npm run build        # dist/two-phases-3d.html (single file) and dist/artifact.html (Artifact fragment)
 npm run sim          # headless physics run that logs phase transitions
+npm run sweep        # delay experiment: share of phases ending in collapse against the regulator's delay
+NODE_PATH=$(npm root -g) node tools/screenshot.mjs out until:1 wait:700 snap:collapse   # headless screenshots (needs Playwright)
 ```
 
 `npm run sim -- 80 480 0.42 6 0.8` takes nodes, seconds, gravity scale, max link degree and container scale.

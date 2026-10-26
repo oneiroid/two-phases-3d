@@ -72,13 +72,14 @@ const hooks={
 /* ---------- simulation ---------- */
 const N=cl(Math.round(innerWidth*innerHeight/9000),45,90);
 const S=createSim(N,hooks);
+window.__tp3d={sim:S};   // also read by the headless screenshot tool
 const NM=S.NM,R=S.R,SP=S.SP;
 
 /* ---------- colour: one scale for everything, how close a part is to breaking ---------- */
 const lin=c=>Math.pow(c/255,2.2),L3=a=>a.map(lin);
 const C0=L3([120,145,175]),C1=L3([245,180,60]),C2=L3([255,64,48]);
 const WARM=L3([255,214,150]),FRAG=L3([255,179,102]),STREAK=L3([242,186,138]),HALO=L3([150,170,200]),REACH=L3([200,220,255]),RING=L3([200,215,240]),
-  HOT=L3([255,240,200]),TIP=L3([230,240,255]),IDLE=L3([110,120,140]),SHOCK=L3([255,170,90]);
+  HOT=L3([255,240,200]),TIP=L3([230,240,255]),IDLE=L3([110,120,140]),SHOCK=L3([255,170,90]),SIGNAL=L3([150,190,255]);
 const sc=[0,0,0];
 function scol(x){x=cl(x,0,1);const p=x<.5?C0:C1,q=x<.5?C1:C2,t=x<.5?x*2:(x-.5)*2;sc[0]=p[0]+(q[0]-p[0])*t;sc[1]=p[1]+(q[1]-p[1])*t;sc[2]=p[2]+(q[2]-p[2])*t;return sc}
 
@@ -101,12 +102,6 @@ const nodeMat=new THREE.ShaderMaterial({uniforms:{uFog:fogU},transparent:true,
   gl_FragColor=vec4(c*fogK(vD),vMisc.x);}`});
 const nodes=new THREE.InstancedMesh(nodeGeo,nodeMat,NM);nodes.instanceMatrix.setUsage(THREE.DynamicDrawUsage);nodes.frustumCulled=false;nodes.renderOrder=1;scene.add(nodes);
 
-/* shells: the reach of a heavy node, and the shock front of a fission */
-const shellGeo=new THREE.SphereGeometry(1,40,28),shCol=inst(NM*2,4);shellGeo.setAttribute('aC',shCol);
-const shellMat=new THREE.ShaderMaterial({uniforms:{uFog:fogU},transparent:true,depthWrite:false,blending:THREE.CustomBlending,blendSrc:THREE.OneFactor,blendDst:THREE.OneFactor,
-  vertexShader:`attribute vec4 aC;varying vec3 vN,vV;varying vec4 vC;varying float vD;void main(){vec4 mv=modelViewMatrix*instanceMatrix*vec4(position,1.);vN=normalize(normalMatrix*mat3(instanceMatrix)*normal);vV=-mv.xyz;vC=aC;vD=-mv.z;gl_Position=projectionMatrix*mv;}`,
-  fragmentShader:`${FOG}varying vec3 vN,vV;varying vec4 vC;varying float vD;void main(){float nv=abs(dot(normalize(vN),normalize(vV)));float a=pow(1.-nv,4.)*1.4+.015;gl_FragColor=vec4(vC.rgb*vC.a*a*fogK(vD),1.);}`});
-const shells=new THREE.InstancedMesh(shellGeo,shellMat,NM*2);shells.instanceMatrix.setUsage(THREE.DynamicDrawUsage);shells.frustumCulled=false;shells.renderOrder=3;scene.add(shells);
 
 /* billboards: halos, flashes, level rings, growing-link tips */
 const BB=NM*8,bbGeo=new THREE.InstancedBufferGeometry();
@@ -232,19 +227,22 @@ function setMute(v){muted=v;snd.textContent=v?'Sound off':'Sound on';snd.setAttr
 snd.addEventListener('click',()=>{audio();setMute(!muted)});
 
 /* ---------- per-frame fill of the GPU buffers ---------- */
-const M4=nodes.instanceMatrix.array,SM=shells.instanceMatrix.array;
+const M4=nodes.instanceMatrix.array;
 function setM(arr,k,x,y,z,s){const o=k*16;arr[o]=s;arr[o+1]=0;arr[o+2]=0;arr[o+3]=0;arr[o+4]=0;arr[o+5]=s;arr[o+6]=0;arr[o+7]=0;arr[o+8]=0;arr[o+9]=0;arr[o+10]=s;arr[o+11]=0;arr[o+12]=x;arr[o+13]=y;arr[o+14]=z;arr[o+15]=1}
-let nb_=0,nr=0,ns=0;
+let nb_=0,nr=0;
 function bb(x,y,z,s,c,a,kind,w){if(nb_>=BB)return;const k=nb_++;bP.array[k*3]=x;bP.array[k*3+1]=y;bP.array[k*3+2]=z;bS.array[k]=s;
   bC.array[k*4]=c[0];bC.array[k*4+1]=c[1];bC.array[k*4+2]=c[2];bC.array[k*4+3]=a;bK.array[k*2]=kind;bK.array[k*2+1]=w||0}
 function rb(ax,ay,az,bx,by,bz,cx,cy,cz,w,c,a){if(nr>=RB)return;const k=nr++,o=k*3;rA.array[o]=ax;rA.array[o+1]=ay;rA.array[o+2]=az;rB.array[o]=bx;rB.array[o+1]=by;rB.array[o+2]=bz;
   rC.array[o]=cx;rC.array[o+1]=cy;rC.array[o+2]=cz;rW.array[k]=w;rK.array[k*4]=c[0];rK.array[k*4+1]=c[1];rK.array[k*4+2]=c[2];rK.array[k*4+3]=a}
 function line(ax,ay,az,bx,by,bz,w,c,a){rb(ax,ay,az,bx,by,bz,(ax+bx)/2,(ay+by)/2,(az+bz)/2,w,c,a)}
-function shell(x,y,z,r,c,a){if(ns>=NM*2)return;setM(SM,ns,x,y,z,r);const o=ns*4;shCol.array[o]=c[0];shCol.array[o+1]=c[1];shCol.array[o+2]=c[2];shCol.array[o+3]=a;ns++}
+// a sphere seen from outside is a circle: reach, fission fronts and the load signal are drawn as camera-facing rings
+// (th = line thickness in world units, plus a wide faint halo when glow > 0)
+// the billboard's band is centred at size·(1 − w) with half-width size·w, so size = r + h and w = h / size put it on r
+function ring(x,y,z,r,c,a,th,glow){if(r<1||a<.003)return;const band=(h,al)=>bb(x,y,z,r+h,c,al,2,Math.min(.5,h/(r+h)));band(th/2,a);if(glow)band(th*3,a*glow)}
 
 function fill(es){
   const v=S.view(),A=v.A,{px,py,pz,vx,vy,vz,m,nb,abs,absT,absD,sig,zap,frag,lv,born}=S,D=v.D,T=v.T,st=v.state;
-  nb_=0;nr=0;ns=0;let n=0;
+  nb_=0;nr=0;let n=0,ext=0;
   const gw=st===0||st===3?1+1.6*D:.6;
   for(const i of A){
     let r=S.rad(i),al=Math.min(1,(T-born[i])/.6+(born[i]===0?1:0));
@@ -256,68 +254,96 @@ function fill(es){
     if(s>.5&&nb[i]){const c=scol(s);nCore.array[n*4]=c[0];nCore.array[n*4+1]=c[1];nCore.array[n*4+2]=c[2];nCore.array[n*4+3]=(s-.5)*1.6}else nCore.array[n*4+3]=0;
     nMisc.array[n*2]=al;nMisc.array[n*2+1]=zap[i];n++;
     if(abs[i]>=0)continue;
+    if(nb[i])ext=Math.max(ext,Math.hypot(px[i]-v.bcx,py[i]-v.bcy,pz[i]-v.bcz));
     if(m[i]>=2.5)bb(px[i],py[i],pz[i],Math.min(120,(r*2+12)*gw),HALO,.006+.004*D,0);
-    if(zap[i]>.05)bb(px[i],py[i],pz[i],r*(1.6+2.2*zap[i]),WARM,.55*zap[i],0);
+    if(zap[i]>.05)bb(px[i],py[i],pz[i],r*(1.5+1.6*zap[i]),WARM,.32*zap[i],0);
     if(nb[i])for(let q=1;q<=lv[i];q++){const rr=r+3.2*q+1.5;bb(px[i],py[i],pz[i],rr,RING,(.55-.1*q)*al,2,1.3/rr)}
     // reach of heavy nodes: appears as a node approaches the threshold, bright while it devours
     const q=m[i]/v.Mth;if(q>=.6){const a=st===3&&q>=.5?(.12+.38*Math.min(1,(q-.5)*2))*(.85+.15*Math.sin(T*12)):Math.pow((Math.min(1,q)-.6)/.4,2)*.4;
-      if(a>.02)shell(px[i],py[i],pz[i],S.reach(i),REACH,a*.16)}
+      if(a>.02)ring(px[i],py[i],pz[i],S.reach(i),REACH,a*.55,1.6,.12)}
     // fragment tracks during the chain reaction
     if(frag[i]>=.15)line(px[i],py[i],pz[i],px[i]-vx[i]*3,py[i]-vy[i]*3,pz[i]-vz[i]*3,r*.5,FRAG,.3*frag[i]);
     // motion streaks in slow motion
     if(es>.02&&vx[i]*vx[i]+vy[i]*vy[i]+vz[i]*vz[i]>.3){const Ls=3+10*es;line(px[i],py[i],pz[i],px[i]-vx[i]*Ls,py[i]-vy[i]*Ls,pz[i]-vz[i]*Ls,2,STREAK,.35*es)}
   }
   nodes.count=n;
-  for(const sh of S.shocks){const p=sh.t/1.1,e=1-Math.pow(1-p,3);shell(sh.x,sh.y,sh.z,sh.r0+SP*2.6*e,SHOCK,.7*(1-p)*(1-p)*Math.min(1,sh.M/5))}
-  shells.count=ns;
+  // fission fronts: each is dimmer when many overlap, so a chain reads as separate rings instead of a white field
+  {const k=1/Math.sqrt(Math.max(1,S.shocks.length));for(const sh of S.shocks){const p=sh.t/1.1,e=1-Math.pow(1-p,3);ring(sh.x,sh.y,sh.z,sh.r0+SP*2.2*e,SHOCK,.9*k*(1-p)*(1-p)*Math.min(1,sh.M/5),2.5+5*(1-p),.3)}}
+  // the load signal on its way to the regulator: rings that close on the body's centre and arrive tauD late
+  if(st===0&&v.tauD>.05){for(const p of pulses){const q=(T-p)/v.tauD;if(q<0||q>1)continue;
+    ring(v.bcx,v.bcy,v.bcz,Math.max(8,ext*(1-q)),SIGNAL,(.05+.25*v.brake)*Math.sin(Math.PI*q),1.2,0)}}
   const F0=S.K0*SP*.25;
   for(const bd of v.bonds){
     const a=bd.a,b=bd.b,gr=bd.gr,ax=px[a],ay=py[a],az=pz[a],bx=ax+(px[b]-ax)*gr,by=ay+(py[b]-ay)*gr,bz=az+(pz[b]-az)*gr;
     const dx=bx-ax,dy=by-ay,dz=bz-az,d=Math.hypot(dx,dy,dz)||1,ut=bd.su,hot=bd.pend?1:0;
-    const w=.9+4.5*Math.min(1.6,bd.sw/F0)+hot*2.5;
+    const w=.9+4.5*Math.min(1.6,bd.sw/F0)+hot*1.2;
     const bow=hot?0:bd.T<0&&ut>.12?d*.18*Math.min(1,ut):ut<.1?d*.05:0;
     let cx=(ax+bx)/2,cy=(ay+by)/2,cz=(az+bz)/2;
     if(bow){const ux=dx/d,uy=dy/d,uz=dz/d,dt=bd.qx*ux+bd.qy*uy+bd.qz*uz;let qx=bd.qx-dt*ux,qy=bd.qy-dt*uy,qz=bd.qz-dt*uz;const ql=Math.hypot(qx,qy,qz)||1;
       cx+=qx/ql*bow*2;cy+=qy/ql*bow*2;cz+=qz/ql*bow*2}
-    if(hot)rb(ax,ay,az,bx,by,bz,cx,cy,cz,w,HOT,.95);else rb(ax,ay,az,bx,by,bz,cx,cy,cz,w,scol(ut),.45+.5*Math.min(1,ut));
+    if(hot)rb(ax,ay,az,bx,by,bz,cx,cy,cz,w,HOT,.5);else rb(ax,ay,az,bx,by,bz,cx,cy,cz,w,scol(ut),.45+.5*Math.min(1,ut));
+    // a link that is yielding (giving way at its limit) carries a thin flickering core
+    if(st===0&&T-bd.yt<.6){const f=1-(T-bd.yt)/.6;rb(ax,ay,az,bx,by,bz,cx,cy,cz,Math.max(.8,w*.28),HOT,f*(.45+.4*Math.sin(T*47+a*1.7)))}
     if(gr<1)bb(bx,by,bz,3.2,TIP,.9,1);
   }
   for(const s of S.snaps){const e=s.life*s.life,dx=px[s.b]-px[s.a],dy=py[s.b]-py[s.a],dz=pz[s.b]-pz[s.a],d=Math.hypot(dx,dy,dz)||1,q=Math.min(d/2,s.l/2*e)/d,w=s.w*(.4+.6*e);
     line(px[s.a],py[s.a],pz[s.a],px[s.a]+dx*q,py[s.a]+dy*q,pz[s.a]+dz*q,w,C2,.85*e);
     line(px[s.b],py[s.b],pz[s.b],px[s.b]-dx*q,py[s.b]-dy*q,pz[s.b]-dz*q,w,C2,.85*e)}
   bbGeo.instanceCount=nb_;rbGeo.instanceCount=nr;
-  for(const a of [nRim,nCore,nMisc,shCol,bP,bS,bC,bK,rA,rB,rC,rW,rK])a.needsUpdate=true;
-  nodes.instanceMatrix.needsUpdate=true;shells.instanceMatrix.needsUpdate=true;
+  for(const a of [nRim,nCore,nMisc,bP,bS,bC,bK,rA,rB,rC,rW,rK])a.needsUpdate=true;
+  nodes.instanceMatrix.needsUpdate=true;
   return v;
 }
 
 /* ---------- HUD ---------- */
 const PH=['growth','collapse','dispersal','consolidation'],PC=['var(--safe)','var(--fail)','var(--ink-dim)','var(--hub)'];
 const phEl=$('ph'),dotEl=$('dot'),cntEl=$('cnt'),vig=$('vig'),barT=$('barT'),barB=$('barB');
-let hudKey='',rateKey='';
+let hudKey='',rateKey='',phName='',phT=0;
 function hud(v,es){
   const k=v.state+'|'+v.level+'|'+v.A.length+'|'+v.bonds.length;
-  if(k!==hudKey){hudKey=k;phEl.textContent=PH[v.state]+((v.state===0||v.state===3)&&v.level?` · level ${v.level+1}`:'');
+  if(k!==hudKey){hudKey=k;const name=PH[v.state]+((v.state===0||v.state===3)&&v.level?` · level ${v.level+1}`:'');
+    // the phase name crossfades when it changes
+    if(name!==phName){phName=name;if(RM)phEl.textContent=name;else{phEl.style.opacity=0;clearTimeout(phT);phT=setTimeout(()=>{phEl.textContent=phName;phEl.style.opacity=1},200)}}
     dotEl.style.background=PC[v.state];dotEl.style.color=PC[v.state];cntEl.textContent=`${v.A.length} nodes · ${v.bonds.length} links`}
   const rk=ts.toFixed(2)+(ctl?'h':'');if(rk!==rateKey){rateKey=rk;rateOut.textContent='×'+ts.toFixed(2);rateOut.classList.toggle('held',!!ctl)}
   vig.style.opacity=es.toFixed(3);barT.style.transform=barB.style.transform=`scaleY(${es.toFixed(3)})`;
+  // self-regulation: D = k·tauD on a 0 to 2.5 scale with the π/2 limit marked; the trace keeps 20 s of load and of the load as seen
+  const grow=v.state===0;fbEl.classList.toggle('off',!grow);
+  if(grow&&v.T-fbLast>=1/30){fbLast=v.T;fbHist.push(v.T,v.sigQ,v.sigHat);while(fbHist.length>3&&fbHist[0]<v.T-20)fbHist.splice(0,3);fbDirty=true}
+  if(!grow&&fbHist.length&&v.state!==1){fbHist.length=0;fbDirty=true}
+  if(grow)fbDk=v.Dk;const dk=fbDk,dkS=dk.toFixed(2);
+  if(dkS!==fbKey){fbKey=dkS;fbD.textContent='D '+dkS;fbFill.style.width=(Math.min(1,dk/2.5)*100).toFixed(1)+'%';
+    fbFill.style.background=dk<1.1?'var(--safe)':dk<Math.PI/2?'var(--loaded)':'var(--fail)'}
+  if(grow){const tk=v.tauD.toFixed(1);if(tk!==fbTauKey){fbTauKey=tk;fbTau.textContent=tk}}
+  if(fbDirty&&fbPlot.offsetParent){fbDirty=false;const SIG0=v.sig0;const W=fbPlot.width,H=fbPlot.height,g=fbG,t1=fbHist.length?fbHist[fbHist.length-3]:0,X=t=>W-(t1-t)/20*W,Y=s=>H-2-Math.min(1,s)*(H-4);
+    g.clearRect(0,0,W,H);g.lineWidth=1;g.strokeStyle='rgba(120,145,175,.35)';g.setLineDash([3,4]);g.beginPath();g.moveTo(0,Y(SIG0));g.lineTo(W,Y(SIG0));g.stroke();g.setLineDash([]);
+    for(const [o,c] of [[1,'#f5b43c'],[2,'#c8dcff']]){g.strokeStyle=c;g.lineWidth=o===1?2.2:1.6;g.globalAlpha=o===1?.9:.8;g.beginPath();
+      for(let j=0;j<fbHist.length;j+=3){const x=X(fbHist[j]),y=Y(fbHist[j+o]);j?g.lineTo(x,y):g.moveTo(x,y)}g.stroke()}g.globalAlpha=1}
 }
+const fbEl=$('fb'),fbD=$('fbD'),fbFill=$('fbFill'),fbTau=$('fbTau'),fbPlot=$('fbPlot'),fbG=fbPlot.getContext('2d'),fbHist=[];
+let fbLast=-1,fbKey='',fbDk=0,fbTauKey='',fbDirty=true;
 
 /* ---------- loop ---------- */
-let last=performance.now(),tsT=1;
+let last=performance.now(),tsT=1,lastEv=null,cine=0,lastPulse=-9;const focus=new THREE.Vector3();const pulses=[];
 function frame(t){
   const dtR=Math.min(.05,Math.max(.001,(t-last)/1000));last=t;tReal+=dtR;
   if(!hintGone){hintT+=dtR;if(hintT>14)hideHint()}
   tsT=ctl?cl(base*SLOW*Math.pow(2,(ctl.y0-ctl.y)/70),.02,4):base;
+  // bullet time: the first seconds of a fission chain play slowed down and the view leans toward the hub that split
+  const ev=S.view().ev;if(ev&&ev!==lastEv){lastEv=ev;if(ev.k==='collapse'&&!RM){cine=2.6;focus.set(ev.x,ev.y,ev.z)}}
+  if(cine>0){cine=Math.max(0,cine-dtR);if(!ctl)tsT=Math.min(tsT,base*(.2+.8*(1-sstep(Math.min(1,cine/1.3)))))}
   ts+=(tsT-ts)*Math.min(1,dtR*5);
   S.step(dtR*ts);
   const es=sstep(cl((1-ts)/(1-SLOW),0,1));
+  {const vv=S.view();if(vv.state===0&&vv.T-lastPulse>.75){lastPulse=vv.T;pulses.push(vv.T)}while(pulses.length&&pulses[0]<vv.T-8)pulses.shift()}
   const v=fill(es);
   // camera: inertia after a drag, then a slow tumble about a drifting axis once the view has been left alone for a few seconds
   idle+=dtR;
   if(!drag&&!pinch){const k=Math.pow(.03,dtR);angV.multiplyScalar(k);turn(angV.x*dtR*60,angV.y*dtR*60,angV.z*dtR*60)}
   if(!RM&&idle>4){const w=Math.min(1,(idle-4)/3)*dtR*Math.min(1,ts);turn(.018*Math.sin(tReal*.051)*w,-.05*w,.012*Math.sin(tReal*.033+1)*w)}
   if(v.nBound>0)tgtGoal.set(v.bcx*.7,v.bcy*.7,v.bcz*.7);else tgtGoal.set(0,0,0);
+  if(cine>0)tgtGoal.lerp(focus,.45*sstep(Math.min(1,cine/.8)));
+  else if(v.state===3&&!RM){let h=-1;for(const i of v.A)if(h<0||S.m[i]>S.m[h])h=i;if(h>=0){focus.set(S.px[h],S.py[h],S.pz[h]);tgtGoal.lerp(focus,.3)}}
   tgt.lerp(tgtGoal,1-Math.exp(-dtR*.8));
   const fit=R*1.02/(Math.tan(camera.fov*Math.PI/360)*Math.min(1,camera.aspect)),dist=fit*zoom;
   _off.set(0,0,dist).applyQuaternion(camQ);camera.position.copy(tgt).add(_off);camera.quaternion.copy(camQ);
@@ -326,8 +352,8 @@ function frame(t){
   sky.position.copy(camera.position);
   fogU.value.set(dist-R*.5,dist+R*1.4);
   // trails stay for slow motion but are cut while the view turns quickly, where they would only smear the whole frame
-  after.uniforms.damp.value=RM?0:(.3+.35*es)*(1-Math.min(1,Math.hypot(angV.x,angV.y,angV.z)*25));
-  bloom.strength=.6+.2*Math.min(1,v.heat)+(v.state===1?.25:0);
+  after.uniforms.damp.value=RM?0:Math.min(v.state===1?.4:.55,.3+.35*es)*(1-Math.min(1,Math.hypot(angV.x,angV.y,angV.z)*25));
+  bloom.strength=.55+.15*Math.min(1,v.heat)+(v.state===1?.08:0);
   // drone follows the average load
   if(AC&&dg){const at=AC.currentTime,p=Math.pow(ts,.6),s=cl(v.sigma,0,1.2),stt=v.state;
     dg.gain.setTargetAtTime(stt===1?.07:stt===2?.012+.02*v.heat:.015+.05*s,at,.25);lp.frequency.setTargetAtTime(Math.min(4000,(stt===2?160:220+900*s*s)*p),at,.15);

@@ -17,7 +17,13 @@
 <canvas id="c" tabindex="0" aria-label="Three-dimensional simulation of a growing network that alternates between collapse and consolidation"></canvas>
 <div id="vig" class="fx"></div>
 <div id="barT" class="bar"></div><div id="barB" class="bar"></div>
-<div id="tl" class="hud"><div class="name">Two Phases</div><div class="phase"><span class="dot" id="dot"></span><span id="ph">dispersal</span></div><div id="cnt">&nbsp;</div></div>
+<div id="tl" class="hud"><div class="name">Two Phases</div><div class="phase"><span class="dot" id="dot"></span><span id="ph">dispersal</span></div><div id="cnt">&nbsp;</div>
+  <div id="fb" aria-hidden="true">
+    <div class="fbrow"><span>regulation</span><span id="fbD">D 0.00</span></div>
+    <div class="fbbar"><i id="fbFill"></i><b></b></div>
+    <canvas id="fbPlot" width="340" height="80"></canvas>
+    <div class="fbkey"><span class="k1">load</span><span class="k2">seen <span id="fbTau">0.0</span> s late</span></div>
+  </div></div>
 <div id="bl" class="hud"><label for="rateIn">time</label><input id="rateIn" type="range" min="0" max="1000" step="1" value="881"><output id="rate" for="rateIn">×1.00</output><button id="rate1" type="button" aria-label="Reset time rate to normal speed">1×</button></div>
 <div id="br" class="hud">link and node load<div class="scale"></div><div class="ticks"><span>safe</span><span>loaded</span><span>failing</span></div></div>
 <button id="snd" type="button" aria-pressed="true">Sound on</button>
