@@ -78,7 +78,7 @@ The load limits are `u > 1` (tension) and `u < −1.4` (compression), so a link 
 
 **In growth, links never break.** An overloaded link yields: its rest length gives way just enough to hold the load at the limit, so the link stays red and keeps its stress. The stress is released all at once in the collapse.
 
-- **Collapse trigger.** During growth, once `D > 0.45`, if at least `max(3, 10% of links)` links have yielded within the last 0.5 s and one of them touches a hub, that hub undergoes fission and the collapse phase starts. A hub is a node in about the top 8% by mass with mass of at least 3.5. Without a hub under overload, growth goes on until the overload reaches one, or a node grows heavy enough to start consolidation.
+- **Collapse trigger.** During growth, once `D > 0.45`, if at least `max(3, 10% of links)` links have yielded within the last 0.5 s and one of them touches a hub, that hub undergoes fission and the collapse phase starts. A hub is a node in about the top 8% by mass with mass of at least 3.5. Without a hub under overload, growth goes on until the overload reaches one, or a node grows heavy enough to start consolidation. As a safety net, a growth phase that lasts 80 s collapses at its heaviest node; this does not happen in normal runs.
 
 A break, which happens only in collapse and dispersal, has these effects:
 

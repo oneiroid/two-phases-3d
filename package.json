@@ -1,6 +1,6 @@
 {
   "name": "two-phases-3d",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "description": "3D simulation of a stressed network that grows, then collapses in a fission chain or consolidates into hubs.",

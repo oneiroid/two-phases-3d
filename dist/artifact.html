@@ -94,7 +94,7 @@ html,body{height:100%;margin:0;background:var(--void);color:var(--ink);overflow:
 <script>setTimeout(()=>{if(!window.__tp3d)document.getElementById('fail').hidden=false},9000);</script>
 <script type="module">
 /* Two Phases, 3D simulation core. No rendering here: the page reads the arrays and draws them.
-   states: 0 slow growth, 1 collapse (fission chain), 2 dispersal, 3 bifurcation (consolidation) */
+   states: 0 slow growth, 1 collapse (fission chain), 2 dispersal, 3 consolidation (bifurcation) */
 function createSim(N, hooks, opt){
   opt=opt||{};
   const H=hooks||{};const call=(k,...a)=>{if(H[k])H[k](...a)};
@@ -109,7 +109,7 @@ function createSim(N, hooks, opt){
     absT=F(),absD=F(),offx=F(),offy=F(),offz=F(),born=F();
   const nb=new Uint8Array(NM),act=new Uint8Array(NM),arr=new Uint8Array(NM),lv=new Uint8Array(NM),abs=new Int16Array(NM).fill(-1);
   let A=[],bonds=[],pend=[];const bset=new Set();
-  let state=2,D=0,heat=.8,level=0,fastCount=0,fT=0,T=0,hubLinked=false,Mth0=N*.3,Mth=Mth0,quiet=0,bifEnd=-1,sigma=0,
+  let state=2,D=0,heat=.8,level=0,fT=0,T=0,gT=0,Mth0=N*.3,Mth=Mth0,quiet=0,bifEnd=-1,sigma=0,
     bcx=0,bcy=0,bcz=0,nBound=0,lastAbs=0,ev=null,
     brake=0,Deff=0,sigQ=0,tauD=0,kG=0,sigHat=0,col0=0,colBroken=0,hm0=0,depth=0;
   const hist=[],hitTried=new Set();
@@ -205,7 +205,7 @@ function createSim(N, hooks, opt){
     // the outcome follows from where the structure fails: an overloaded hub explodes
     const hubM=Math.max(3.5,heavyCut());let hit=-1;
     for(const b of over)for(const i of [b.a,b.b])if(act[i]&&m[i]>=hubM&&(hit<0||m[i]>m[hit]))hit=i;
-    if(hit>=0){fastCount++;collapse(hit)}
+    if(hit>=0)collapse(hit)
   }
   const heavyMass=()=>{let s=0;for(const i of A)if(act[i]&&m[i]>=2.5)s+=m[i];return s};
   function collapse(hit){state=1;fT=0;pend=[];col0=bonds.length;colBroken=0;hm0=heavyMass();hitTried.clear();ev={k:'collapse',t:T,x:px[hit]||0,y:py[hit]||0,z:pz[hit]||0};if(hit>=0)fission(hit)}
@@ -215,9 +215,9 @@ function createSim(N, hooks, opt){
     state=2;heat=Math.max(heat,.6);level=Math.max(0,level-lost);Mth=Mth0;for(const i of A)lv[i]=Math.min(lv[i],level);ev={k:'disperse',t:T,depth,lost};
     for(const o of bonds)o.pend=0;pend=[];for(const i of A)fis[i]=0;
   }
-  function bifurcate(){state=3;fT=0;quiet=0;bifEnd=-1;hubLinked=false;fastCount++;ev={k:'bifurcate',t:T};call('bif')}
+  function bifurcate(){state=3;fT=0;quiet=0;bifEnd=-1;ev={k:'bifurcate',t:T};call('bif')}
   function linkHubs(){
-    hubLinked=true;call('hubs');
+    call('hubs');
     const hubs=A.filter(i=>act[i]&&abs[i]<0);
     for(const a of hubs){if(!act[a])continue;
       const o=hubs.filter(b=>b!==a&&act[b]).sort((p,q)=>Math.hypot(px[p]-px[a],py[p]-py[a],pz[p]-pz[a])-Math.hypot(px[q]-px[a],py[q]-py[a],pz[q]-pz[a]));
@@ -338,7 +338,8 @@ function createSim(N, hooks, opt){
       brake=cl(brake+dt*kG*(sigHat-SIG0)/SIG0,0,1);
       {let big=-1;for(const i of A)if(abs[i]<0&&m[i]>=Mth&&(big<0||m[i]>m[big]))big=i;if(big>=0)bifurcate()}
       if(state===0&&D>.45){const over=bonds.filter(o=>T-o.yt<.5);if(over.length>=Math.max(3,bonds.length*.1))trigger(over)}
-      else if(state===0&&D>9){let mi=-1;for(const i of A)if(mi<0||m[i]>m[mi])mi=i;collapse(mi)}
+      // safety net: a slow phase that neither tears nor consolidates within 80 s ends at its heaviest node (does not happen in normal runs)
+      else if(state===0&&T-gT>80){let mi=-1;for(const i of A)if(abs[i]<0&&(mi<0||m[i]>m[mi]))mi=i;if(mi>=0)collapse(mi)}
     }else if(state===1){
       fT+=dt;pend=pend.filter(o=>!o.dead);
       // a fragment that reaches a heavy node can split it too: surely if the node is loaded, rarely if it is relaxed (one try per pair)
@@ -364,10 +365,10 @@ function createSim(N, hooks, opt){
           let mx=0;for(const i of A)mx=Math.max(mx,m[i]);const tgt=Mth*.45,pw=mx>tgt?Math.log(tgt)/Math.log(mx):1;
           for(const i of A){mT[i]=m[i]>1?Math.pow(m[i],pw):m[i];if(m[i]>2)lv[i]=Math.min(3,lv[i]+1)}}
       }else{const q=Math.min(1,dt*4);for(const i of A)if(mT[i]>0)m[i]+=(mT[i]-m[i])*q;
-        if(fT-bifEnd>.8){for(const i of A){if(mT[i]>0)m[i]=mT[i];mT[i]=0}state=0;D=.15;brake=0;hist.length=0;level++;ev={k:'level',t:T}}}
+        if(fT-bifEnd>.8){for(const i of A){if(mT[i]>0)m[i]=mT[i];mT[i]=0}state=0;D=.15;brake=0;hist.length=0;gT=T;level++;ev={k:'level',t:T}}}
     }else{
       heat-=heat*dt/3.2;
-      if(heat<.3&&!bonds.length){state=0;D=0;brake=0;hist.length=0;ev={k:'grow',t:T}}
+      if(heat<.3&&!bonds.length){state=0;D=0;brake=0;hist.length=0;gT=T;ev={k:'grow',t:T}}
     }
     if(state===0)Deff=D*(1-brake);else if(state===3)Deff=D;   // held through a collapse: the intact part stays bound
     if(state===0){let hot=0;for(const b of bonds)if(Math.abs(b.u)>.75)hot++;if(hot)call('creak',hot)}
@@ -377,7 +378,7 @@ function createSim(N, hooks, opt){
   }
 
   return {N,NM,SP,R,K0,px,py,pz,vx,vy,vz,m,sig,fat,zap,frag,abs,absT,absD,nb,act,arr,lv,born,snaps,shocks,rad,reach,step,
-    view:()=>({A,bonds,state,D,heat,level,Mth,T,sigma,bcx,bcy,bcz,nBound,fastCount,ev,pend:pend.length,
+    view:()=>({A,bonds,state,D,heat,level,Mth,T,sigma,bcx,bcy,bcz,nBound,ev,pend:pend.length,
       brake,Deff,tauD,kG,Dk:kG*tauD,sigHat,sigQ,depth})};
 }
 

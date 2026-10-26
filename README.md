@@ -41,6 +41,7 @@ On touch screens, one finger rotates and two fingers zoom and twist (roll). Slow
 npm run build        # dist/two-phases-3d.html (single file) and dist/artifact.html (Artifact fragment)
 npm run sim          # headless physics run that logs phase transitions
 npm run sweep        # delay experiment: share of phases ending in collapse against the regulator's delay
+NODE_PATH=$(npm root -g) node tools/screenshot.mjs out until:1 wait:700 snap:collapse   # headless screenshots (needs Playwright)
 ```
 
 `npm run sim -- 80 480 0.42 6 0.8` takes nodes, seconds, gravity scale, max link degree and container scale.
