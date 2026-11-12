@@ -1,0 +1,590 @@
+<title>Life Rules</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Martian+Mono:wght@300;500&display=swap">
+<style>
+/* One full-screen WebGL grid with a thin instrument layer: readout top left, the rule top right, tools along the bottom. */
+:root{
+  color-scheme:dark;
+  --void:#05070a;
+  --ink:#cfd8e3;
+  --ink-dim:#6f7d8f;
+  --line:rgba(125,148,175,.28);
+  --alive:#ffd166;
+  --change:#3fb8a5;
+  --kin:#c48bff;
+  --mono:"Martian Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  background:var(--void);
+}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0;background:var(--void);color:var(--ink);overflow:hidden;overscroll-behavior:none}
+#c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;outline:none;cursor:crosshair}
+#c.pan{cursor:grab}
+.hud{position:fixed;font:300 11px/1.6 var(--mono);letter-spacing:.04em;color:var(--ink-dim);font-variant-numeric:tabular-nums}
+/* the two corner panels sit on a dark plate, because the grid behind them can be any colour */
+#tl,#tr{padding:9px 11px 10px;border-radius:5px;background:rgba(5,7,10,.72);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+#tl{top:calc(5px + env(safe-area-inset-top,0px));left:max(5px,env(safe-area-inset-left,0px));pointer-events:none;width:170px}
+#tl .name{font-weight:500;font-size:10px;letter-spacing:.22em;text-transform:uppercase}
+#tl .phase{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink);font-weight:500;letter-spacing:.06em;margin-top:2px}
+#tl .dot{width:7px;height:7px;border-radius:50%;background:var(--change);box-shadow:0 0 8px currentColor;transition:background .4s}
+#cnt{white-space:nowrap}
+#plot{display:block;width:170px;height:40px;margin-top:8px}
+#tl .key{display:flex;gap:8px;white-space:nowrap;font-size:9px;letter-spacing:.06em;margin-top:3px}
+#tl .key span::before{content:"";display:inline-block;width:10px;height:2px;margin-right:5px;vertical-align:middle;border-radius:1px;background:var(--alive)}
+#tl .key .k2::before{background:var(--change)}
+#tl .key .k3::before{background:var(--kin)}
+#ev{margin-top:6px;font-size:10px;color:var(--ink);opacity:0;transition:opacity 1.5s}
+#ev.on{opacity:1;transition:opacity .2s}
+#tr{top:calc(5px + env(safe-area-inset-top,0px));right:max(5px,env(safe-area-inset-right,0px));width:248px;box-sizing:border-box}
+#tr summary{display:flex;justify-content:space-between;gap:10px;font-size:9px;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;list-style:none}
+#tr summary::-webkit-details-marker{display:none}
+#tr summary span:first-child::after{content:" +"}
+#tr[open] summary span:first-child::after{content:" −"}
+#tr:not([open]){width:auto}
+#rname{color:var(--ink);letter-spacing:.04em;text-transform:none;font-weight:500;font-size:11px}
+#tr .row{display:flex;align-items:center;gap:6px;margin-top:7px}
+#tr .lab{width:38px;font-size:9px;letter-spacing:.08em}
+#tr .bits{display:grid;grid-template-columns:repeat(9,18px);gap:2px}
+#tr .bits button{width:18px;height:20px;padding:0;letter-spacing:0;font-size:9px}
+#tr p{margin:8px 0 0;font-size:9px;line-height:1.65;letter-spacing:.02em}
+#tr p b{color:var(--ink);font-weight:500}
+select{font:500 10px/1 var(--mono);letter-spacing:.04em;color:var(--ink);background:rgba(5,7,10,.55);border:1px solid var(--line);border-radius:3px;padding:6px 5px;cursor:pointer;max-width:100%}
+#preset{width:100%;margin-top:8px}
+#bar{left:0;right:0;bottom:0;display:flex;flex-wrap:wrap;justify-content:center;gap:8px 18px;padding:26px max(16px,env(safe-area-inset-right,0px)) calc(12px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));
+  background:linear-gradient(0deg,rgba(5,7,10,.92) calc(100% - 26px),rgba(5,7,10,0))}
+.grp{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:6px}
+button{font:500 10px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-dim);background:rgba(5,7,10,.55);border:1px solid var(--line);border-radius:3px;padding:8px 9px;cursor:pointer}
+button:hover:not(:disabled){color:var(--ink);border-color:rgba(200,220,255,.5)}
+button:disabled{opacity:.4;cursor:default}
+button[aria-pressed="true"]{color:var(--void);background:var(--ink);border-color:var(--ink)}
+button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+input[type=range]{-webkit-appearance:none;appearance:none;width:88px;height:20px;margin:0;background:transparent;cursor:pointer}
+input[type=range]::-webkit-slider-runnable-track{height:2px;border-radius:1px;background:rgba(125,148,175,.4)}
+input[type=range]::-moz-range-track{height:2px;border-radius:1px;background:rgba(125,148,175,.4)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:12px;height:12px;margin-top:-5px;border-radius:50%;background:var(--ink)}
+input[type=range]::-moz-range-thumb{width:12px;height:12px;border:0;border-radius:50%;background:var(--ink)}
+#hint{position:fixed;left:50%;bottom:calc(86px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);width:max-content;max-width:calc(100vw - 32px);text-align:center;
+  font:300 11px/1.7 var(--mono);letter-spacing:.04em;color:var(--ink-dim);pointer-events:none;transition:opacity 1.2s;padding:6px 10px;border-radius:5px;background:rgba(5,7,10,.88)}
+#hint b{color:var(--ink);font-weight:500}
+#fail{position:fixed;inset:0;display:grid;place-items:center;padding-inline:16px;font:300 12px/1.7 var(--mono);color:var(--ink);text-align:center;background:var(--void)}
+@media (max-width:640px){
+  #tl{width:auto}
+  #tr{top:calc(78px + env(safe-area-inset-top,0px));max-width:calc(100vw - 10px)}
+  #plot,#tl .key{display:none}
+  input[type=range]{width:64px}
+  #bar{gap:6px 10px}
+  button{padding:8px 7px}
+  #hint{bottom:calc(192px + env(safe-area-inset-bottom,0px))}
+}
+@media (prefers-reduced-motion:reduce){#hint,#ev{transition:none}}
+</style>
+<canvas id="c" tabindex="0" aria-label="Conway's Game of Life on a wrapping grid. Each cell is coloured by the lineage it descends from"></canvas>
+<div id="tl" class="hud">
+  <div class="name">Life</div>
+  <div class="phase"><span class="dot" id="dot"></span><span id="ph">soup</span></div>
+  <div id="cnt">&nbsp;</div>
+  <canvas id="plot" width="340" height="80" aria-hidden="true"></canvas>
+  <div class="key"><span class="k1">alive</span><span class="k2">changing</span><span class="k3">lineages</span></div>
+  <div id="ev">&nbsp;</div>
+</div>
+<details id="tr" class="hud">
+  <summary><span>rule</span><span id="rname">B3/S23</span></summary>
+  <select id="preset" aria-label="Known rules"></select>
+  <div class="row"><span class="lab" id="lb">born</span><span class="bits" id="bB" role="group" aria-labelledby="lb"></span></div>
+  <div class="row"><span class="lab" id="ls">stays</span><span class="bits" id="bS" role="group" aria-labelledby="ls"></span></div>
+  <p>Count the live cells among a cell's eight neighbours. An empty cell is <b>born</b> on a lit count. A live cell <b>stays</b> on a lit count and dies otherwise. That is the whole rule.</p>
+  <div class="row"><button id="mutate" type="button" title="Flip one switch at random (X)">mutate</button><button id="back" type="button" title="Return to the previous rule (Z)" disabled>back</button></div>
+</details>
+<div id="bar" class="hud">
+  <div class="grp" role="group" aria-label="Tool">
+    <button id="tDraw" type="button" aria-pressed="true" title="Draw single cells (D)">draw</button>
+    <button id="tSpray" type="button" aria-pressed="false" title="Spray random cells (S)">spray</button>
+    <button id="tErase" type="button" aria-pressed="false" title="Erase (E)">erase</button>
+    <button id="tStamp" type="button" aria-pressed="false" title="Place a pattern (T)">stamp</button>
+    <select id="pat" aria-label="Pattern to stamp"></select>
+    <button id="tPan" type="button" aria-pressed="false" title="Move around (right drag, or two fingers)">move</button>
+  </div>
+  <div class="grp" role="group" aria-label="Colour by">
+    <button id="v0" type="button" aria-pressed="true" title="Colour by lineage (1)">kin</button>
+    <button id="v1" type="button" aria-pressed="false" title="Colour by age (2)">age</button>
+  </div>
+  <div class="grp"><label for="spd">speed</label><input id="spd" type="range" min="0" max="9" step="1" value="6"><button id="pause" type="button" aria-pressed="false" title="Space">pause</button><button id="one" type="button" title="One generation (.)">step</button></div>
+  <div class="grp"><label for="noise" title="Random flips. At zero the rule is exact">noise</label><input id="noise" type="range" min="0" max="100" step="1" value="0"></div>
+  <div class="grp">
+    <button id="soup" type="button" title="Fill with random cells (N)">soup</button>
+    <button id="clear" type="button" title="Empty the grid (C)">clear</button>
+  </div>
+</div>
+<div id="hint"><b>wheel</b> or <b>pinch</b> to zoom in · <b>drag</b> to draw cells · <b>right drag</b> or <b>two fingers</b> to move · the switches top right are the rule</div>
+<div id="fail" hidden>This needs WebGL 2, and it could not start in this browser.</div>
+<script>setTimeout(()=>{if(!window.__life)document.getElementById('fail').hidden=false},6000);</script>
+<script type="module">
+// Life Rules: Conway's Game of Life, and every other rule of its family, on a wrapping grid.
+// The rule is two rows of switches. An empty cell is born when its count of live neighbours (out of eight) is lit in the first row;
+// a live cell stays when its count is lit in the second row, and dies otherwise. Nothing else acts on the cells.
+// Two things ride along without touching the rule: each cell remembers how long it has held its state (for the glow and the trails),
+// and a newborn takes the colour of one of its parents, so a lineage can be followed by eye.
+// The grid is one RGBA8 texture stepped in a fragment shader. No libraries.
+
+const $ = id => document.getElementById(id);
+const canvas = $('c');
+const q = new URLSearchParams(location.search);
+const N = Math.max(64, Math.min(2048, +(q.get('n') || 512) | 0));
+const gl = canvas.getContext('webgl2', {antialias: false, alpha: false, powerPreference: 'high-performance'});
+if (!gl) {$('fail').hidden = false;throw new Error('WebGL 2 unavailable')}
+
+const VS = `#version 300 es
+void main(){gl_Position = vec4(vec2(gl_VertexID & 1, gl_VertexID >> 1)*4. - 1., 0., 1.);}`;
+
+// A texel: r alive, g generations in the current state (capped at 255), b lineage hue.
+const SIM = `#version 300 es
+precision highp float;
+precision highp int;
+precision highp sampler2D;
+uniform sampler2D A;
+uniform int N, born, surv, gen, run;   // born and surv are bit masks over the neighbour count; run 0 only paints
+uniform float noise;                   // chance per cell per generation of a random flip
+uniform vec4 seg;                      // brush stroke: start, and the vector to its end
+uniform vec4 brush;                    // radius, mode (1 alive, 2 random cells, 3 dead), hue, seed
+out vec4 o;
+uvec3 pcg(uvec3 v){
+  v = v*1664525u + 1013904223u;
+  v.x += v.y*v.z;v.y += v.z*v.x;v.z += v.x*v.y;
+  v ^= v >> 16u;
+  v.x += v.y*v.z;v.y += v.z*v.x;v.z += v.x*v.y;
+  return v;
+}
+void main(){
+  ivec2 p = ivec2(gl_FragCoord.xy);
+  vec4 c = texelFetch(A, p, 0);
+  bool live = c.r > .5;
+  int age = int(c.g*255. + .5);
+  float hue = c.b;
+  if(run == 1){
+    uvec3 h = pcg(uvec3(p, gen));
+    int n = 0;
+    float kin = hue;
+    for(int j = -1; j <= 1; j++) for(int i = -1; i <= 1; i++){
+      if(i == 0 && j == 0) continue;
+      vec4 t = texture(A, (vec2(p + ivec2(i, j)) + .5)/float(N));      // the texture repeats, which wraps the grid
+      if(t.r > .5){
+        n++;
+        h.y = h.y*747796405u + 2891336453u;
+        if((h.y >> 16) % uint(n) == 0u) kin = t.b;                      // keeps each live neighbour with equal chance
+      }
+    }
+    bool next = (((live ? surv : born) >> n) & 1) == 1;
+    if(next && !live) hue = kin;                                        // a newborn takes the colour of one parent
+    if(noise > 0. && float(h.x >> 8)/16777216. < noise){
+      next = !live;
+      if(next) hue = float(h.z & 255u)/255.;
+    }
+    age = next == live ? min(age + 1, 255) : 0;
+    live = next;
+  }
+  if(brush.y > 0.){
+    float fn = float(N);
+    vec2 d = mod(vec2(p) + .5 - seg.xy + .5*fn, fn) - .5*fn;
+    float t = clamp(dot(d, seg.zw)/max(dot(seg.zw, seg.zw), 1e-6), 0., 1.);
+    if(length(d - seg.zw*t) < brush.x){
+      bool want = brush.y < 2.5;
+      if(brush.y > 1.5 && brush.y < 2.5) want = live || float(pcg(uvec3(p, int(brush.w))).x >> 8)/16777216. < .3;
+      if(want != live){live = want;age = 0;if(want) hue = brush.z;}
+    }
+  }
+  o = vec4(live ? 1. : 0., float(age)/255., hue, 1.);
+}`;
+
+const SHOW = `#version 300 es
+precision highp float;
+precision highp int;
+precision highp sampler2D;
+uniform sampler2D A;
+uniform int N, mode;
+uniform vec2 res, ctr;
+uniform float zoom;      // device pixels per cell
+uniform vec4 ring;       // brush cursor: centre, radius, strength
+uniform vec3 hov;        // cell under the pointer, and whether to mark it
+out vec4 o;
+vec3 tint(float h){
+  vec3 k = clamp(abs(fract(h + vec3(0., 2./3., 1./3.))*6. - 3.) - 1., 0., 1.);
+  vec3 c = mix(vec3(1.), k, .82);
+  float d = 1. - dot(c, vec3(.3, .59, .11));
+  return mix(c, vec3(1.), .45*d*d);       // lift the dark hues so every lineage reads on black
+}
+// A cell that has just changed is bright. A live cell cools as it ages; a dead one leaves a short trail.
+vec3 cell(ivec2 p){
+  vec4 c = texelFetch(A, (p % N + N) % N, 0);
+  float age = c.g*255.;
+  bool live = c.r > .5;
+  if(mode == 0){
+    vec3 k = tint(c.b);
+    return live ? mix(vec3(1.), k, smoothstep(0., 4., age))*mix(1., .5, smoothstep(10., 160., age)) : k*.3*exp(-age/9.)*step(age, 254.);
+  }
+  float u = log2(1. + age)/8.;
+  vec3 r = mix(vec3(1., .98, .9), vec3(1., .78, .25), smoothstep(0., .3, u));
+  r = mix(r, vec3(.95, .3, .25), smoothstep(.3, .55, u));
+  r = mix(r, vec3(.55, .2, .75), smoothstep(.55, .8, u));
+  r = mix(r, vec3(.2, .27, .62), smoothstep(.8, 1., u));
+  return live ? r : vec3(.05, .2, .24)*exp(-age/12.)*step(age, 254.);
+}
+void main(){
+  vec2 x = ctr + (gl_FragCoord.xy - .5*res)/zoom;
+  ivec2 p = ivec2(floor(x));
+  vec3 col;
+  if(zoom < 1.){
+    // more than one cell per pixel: add up the four nearest so thin structures do not flicker out
+    ivec2 s = ivec2(floor(x - .5));
+    col = min(vec3(1.), .5*(cell(s) + cell(s + ivec2(1, 0)) + cell(s + ivec2(0, 1)) + cell(s + ivec2(1, 1))));
+  } else {
+    col = cell(p);
+    vec2 f = fract(x)*zoom;
+    if(min(f.x, f.y) < 1.) col = mix(col, col*.12 + .028*smoothstep(8., 16., zoom), smoothstep(3., 7., zoom));   // a gap between cells once they are large enough
+  }
+  if(hov.z > 0. && p == ivec2(hov.xy)) col += .22;
+  if(ring.w > 0.){
+    float fn = float(N);
+    vec2 d = mod(x - ring.xy + .5*fn, fn) - .5*fn;
+    col += vec3(.8)*(1. - smoothstep(.6, 1.6, abs(length(d) - ring.z)*zoom))*ring.w;
+  }
+  vec2 v = gl_FragCoord.xy/res - .5;
+  col *= 1. - .45*dot(v, v);
+  o = vec4(col, 1.);
+}`;
+
+function prog(fs) {
+  const p = gl.createProgram();
+  for (const [t, s] of [[gl.VERTEX_SHADER, VS], [gl.FRAGMENT_SHADER, fs]]) {
+    const sh = gl.createShader(t);
+    gl.shaderSource(sh, s);gl.compileShader(sh);
+    if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(sh));
+    gl.attachShader(p, sh);
+  }
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+  const u = {};
+  for (let i = 0, n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS); i < n; i++) {
+    const name = gl.getActiveUniform(p, i).name;
+    u[name] = gl.getUniformLocation(p, name);
+  }
+  return {p, u};
+}
+const sim = prog(SIM), show = prog(SHOW);
+gl.bindVertexArray(gl.createVertexArray());
+gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+function target() {
+  const t = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, t);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, N, N, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  for (const k of [gl.TEXTURE_MIN_FILTER, gl.TEXTURE_MAG_FILTER]) gl.texParameteri(gl.TEXTURE_2D, k, gl.NEAREST);
+  for (const k of [gl.TEXTURE_WRAP_S, gl.TEXTURE_WRAP_T]) gl.texParameteri(gl.TEXTURE_2D, k, gl.REPEAT);
+  const fbo = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0);
+  return {t, fbo};
+}
+let src = target(), dst = target();
+
+// ---- rules ----
+// name, born, stays, and how the grid starts: a density of random cells, 0 for a single cell, or -n for a random n by n block
+const PRESETS = [
+  ['Life', '3', '23', .35], ['HighLife', '36', '23', .35], ['Day & Night', '3678', '34678', .5], ['Seeds', '2', '', -3],
+  ['Maze', '3', '12345', -7], ['Coral', '3', '45678', .42], ['Anneal', '4678', '35678', .5], ['Diamoeba', '35678', '5678', .48],
+  ['Morley', '368', '245', .2], ['2x2', '36', '125', .35], ['Replicator', '1357', '1357', 0], ['Life without death', '3', '012345678', -7],
+  ['Gnarl', '1', '1', 0], ['Coagulations', '378', '235678', .1], ['Walled cities', '45678', '2345', .42], ['Long life', '345', '5', .3],
+];
+const mask = s => [...s].reduce((m, d) => m | 1 << +d, 0), digits = m => [...Array(9).keys()].filter(i => m >> i & 1).join('');
+let born = 8, surv = 12;
+const past = [];
+const ruleText = () => `B${digits(born)}/S${digits(surv)}`;
+function setRule(b, s, keep) {
+  b &= ~1;                                  // birth on zero neighbours makes the whole grid flash every generation, so it is left out
+  if (b === born && s === surv) return;
+  if (keep !== false) {past.push([born, surv]);if (past.length > 200) past.shift()}
+  born = b;surv = s;
+  showRule();stir();
+}
+function showRule() {
+  const i = PRESETS.findIndex(p => mask(p[1]) === born && mask(p[2]) === surv);
+  $('rname').textContent = ruleText() + (i >= 0 ? ' · ' + PRESETS[i][0] : '');
+  $('preset').value = i;
+  for (let k = 0; k < 9; k++) {$('bS').children[k].setAttribute('aria-pressed', !!(surv >> k & 1));if (k) $('bB').children[k].setAttribute('aria-pressed', !!(born >> k & 1))}
+  $('back').disabled = !past.length;
+  try {history.replaceState(null, '', '#' + ruleText())} catch {}
+}
+function mutate() {
+  const k = 1 + Math.floor(Math.random() * 17);          // one of born 1..8 or stays 0..8
+  if (k <= 8) setRule(born ^ 1 << k, surv); else setRule(born, surv ^ 1 << k - 9);
+  say('mutated to ' + ruleText());
+}
+function back() {const r = past.pop();if (r) {setRule(r[0], r[1], false);say('back to ' + ruleText())}}
+
+// ---- world ----
+let gen = 0, paused = false, view = 0, noise = 0;
+const strokes = [];                        // brush segments waiting to be painted: {x, y, dx, dy, r, mode, hue, seed}
+const rnd = (a, b) => a + Math.random() * (b - a);
+// start: as in PRESETS, or null for an empty grid. Colours start as broad patches, so the mixing of regions shows.
+function reset(start = .35) {
+  const d = new Uint8Array(N * N * 4), T = 2 * Math.PI / N, o1 = rnd(0, 7), o2 = rnd(0, 7), o3 = rnd(0, 1);
+  const blob = start <= 0 ? Math.max(1, -start) : 0, b0 = (N - blob) >> 1;
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const i = (y * N + x) * 4;
+    const on = start === null ? false : blob ? x >= b0 && x < b0 + blob && y >= b0 && y < b0 + blob && (blob < 3 || Math.random() < .6) : Math.random() < start;
+    const h = o3 + .32 * Math.sin(x * T + 1.4 * Math.sin(y * T + o1)) + .32 * Math.sin(2 * y * T - x * T + o2);
+    d[i] = on ? 255 : 0;d[i + 1] = 255;d[i + 2] = Math.round((h - Math.floor(h)) * 255);d[i + 3] = 255;
+  }
+  gl.bindTexture(gl.TEXTURE_2D, src.t);
+  gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, N, N, gl.RGBA, gl.UNSIGNED_BYTE, d);
+  gen = 0;strokes.length = 0;hist.length = 0;stir();
+}
+const PATTERNS = {
+  glider: ['.O.', '..O', 'OOO'],
+  spaceship: ['.O..O', 'O....', 'O...O', 'OOOO.'],
+  'r-pentomino': ['.OO', 'OO.', '.O.'],
+  acorn: ['.O.....', '...O...', 'OO..OOO'],
+  'glider gun': ['........................O...........', '......................O.O...........', '............OO......OO............OO', '...........O...O....OO............OO',
+    'OO........O.....O...OO..............', 'OO........O...O.OO....O.O...........', '..........O.....O.......O...........', '...........O...O....................', '............OO......................'],
+  pulsar: ['..OOO...OOO..', '.............', 'O....O.O....O', 'O....O.O....O', 'O....O.O....O', '..OOO...OOO..', '.............', '..OOO...OOO..', 'O....O.O....O', 'O....O.O....O', 'O....O.O....O', '.............', '..OOO...OOO..'],
+};
+// Writes a pattern centred on a cell, with a clear margin of one cell. turn is the number of quarter turns.
+function stamp(name, wx, wy, turn = 0, hue = Math.random()) {
+  let g = PATTERNS[name].map(r => [...r].map(ch => ch === 'O'));
+  for (let k = 0; k < (turn & 3); k++) g = g[0].map((_, i) => g.map(r => r[i]).reverse());
+  const h = g.length + 2, w = g[0].length + 2, d = new Uint8Array(w * h * 4);
+  for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
+    const on = g[h - 2 - j]?.[i - 1], o = (j * w + i) * 4;       // row 0 of the pattern is its top; texture rows run upward
+    d[o] = on ? 255 : 0;d[o + 1] = on ? 0 : 255;d[o + 2] = hue * 255;d[o + 3] = 255;
+  }
+  const x0 = Math.min(N - w, Math.max(0, Math.round(wx - w / 2))), y0 = Math.min(N - h, Math.max(0, Math.round(wy - h / 2)));
+  gl.bindTexture(gl.TEXTURE_2D, src.t);
+  gl.texSubImage2D(gl.TEXTURE_2D, 0, x0, y0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, d);
+  stir();
+}
+// One shader pass: a generation (run) or only a brush stroke.
+function pass(run, s) {
+  gl.useProgram(sim.p);
+  gl.viewport(0, 0, N, N);
+  gl.uniform1i(sim.u.A, 0);gl.uniform1i(sim.u.N, N);gl.uniform1i(sim.u.born, born);gl.uniform1i(sim.u.surv, surv);
+  gl.uniform1i(sim.u.run, run);gl.uniform1i(sim.u.gen, gen);gl.uniform1f(sim.u.noise, noise);
+  if (s) {gl.uniform4f(sim.u.seg, s.x, s.y, s.dx, s.dy);gl.uniform4f(sim.u.brush, s.r, s.mode, s.hue, s.seed)} else gl.uniform4f(sim.u.brush, 0, 0, 0, 0);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fbo);
+  gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D, src.t);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  [src, dst] = [dst, src];
+  gen += run;
+}
+function paint() {if (strokes.length) stir();while (strokes.length) pass(0, strokes.shift())}
+function step(n) {paint();for (let i = 0; i < n; i++) pass(1)}
+
+// ---- camera: centre in cells, zoom in device pixels per cell. The grid wraps, so any view is full. ----
+let cx = N / 2, cy = N / 2, zoom = 1, dpr = 1, W = 1, H = 1;
+const home = () => Math.max(Math.max(W, H) / N, 3 * dpr);
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = Math.round(innerWidth * dpr), h = Math.round(innerHeight * dpr), first = W === 1;
+  if (w === W && h === H) return;
+  const k = first ? 1 : Math.max(w, h) / Math.max(W, H);
+  W = canvas.width = w;H = canvas.height = h;
+  zoom = first ? home() : zoom * k;
+}
+const zclamp = z => Math.min(48 * dpr, Math.max(Math.min(W, H) / N * .5, z));
+const toWorld = (px, py) => [cx + (px * dpr - W / 2) / zoom, cy + (H / 2 - py * dpr) / zoom];
+const wrap = v => ((v % N) + N) % N;
+function zoomAt(px, py, k) {
+  const [wx, wy] = toWorld(px, py), z = zclamp(zoom * k);
+  cx = wx - (px * dpr - W / 2) / z;cy = wy - (H / 2 - py * dpr) / z;zoom = z;
+}
+function draw(ring, hov) {
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.viewport(0, 0, W, H);
+  gl.useProgram(show.p);
+  gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D, src.t);
+  gl.uniform1i(show.u.A, 0);gl.uniform1i(show.u.N, N);gl.uniform1i(show.u.mode, view);
+  gl.uniform2f(show.u.res, W, H);gl.uniform2f(show.u.ctr, cx, cy);gl.uniform1f(show.u.zoom, zoom);
+  gl.uniform4f(show.u.ring, ring ? ring[0] : 0, ring ? ring[1] : 0, bsize, ring ? .35 : 0);
+  gl.uniform3f(show.u.hov, hov ? Math.floor(hov[0]) : 0, hov ? Math.floor(hov[1]) : 0, hov ? 1 : 0);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+}
+
+// ---- census and readout ----
+const hist = [];                 // {pop, act, kin}
+const cells = new Uint8Array(N * N * 4), occ = new Uint32Array(36);
+let pop = 0, act = 0, kin = 0, calm = 0, settledAt = -1, lastSay = 0;
+function stir() {calm = 0;settledAt = -1}                     // the grid was disturbed: any earlier verdict is void
+function count() {
+  gl.bindFramebuffer(gl.FRAMEBUFFER, src.fbo);
+  gl.readPixels(0, 0, N, N, gl.RGBA, gl.UNSIGNED_BYTE, cells);
+  pop = act = 0;occ.fill(0);
+  for (let i = 0; i < cells.length; i += 4) {
+    if (cells[i] > 127) {pop++;occ[cells[i + 2] * 36 >> 8]++}
+    if (!cells[i + 1]) act++;                                 // changed state in the last generation
+  }
+  kin = 0;for (let j = 0; j < 36; j++) if (occ[j]) kin++;     // occupied bins of the hue circle
+  const prev = hist[hist.length - 1];
+  calm = prev && Math.abs(prev.pop - pop) <= 2 && Math.abs(prev.act - act) <= 4 ? calm + 1 : 0;
+  hist.push({pop, act, kin});if (hist.length > 170) hist.shift();
+}
+function phase() {
+  if (!pop) return ['empty', '#6f7d8f'];
+  if (calm >= 8) return act ? ['settled', '#3fb8a5'] : ['still', '#6f7d8f'];
+  const then = hist[Math.max(0, hist.length - 9)], d = then ? (pop - then.pop) / Math.max(pop, then.pop) : 0;
+  if (d > .06) return ['growing', '#ffd166'];
+  if (d < -.06) return ['dying back', '#ff5a45'];
+  return [act > .2 * pop ? 'burning' : 'smouldering', '#ff9a4d'];
+}
+function say(t) {const e = $('ev');e.textContent = t;e.classList.add('on');lastSay = performance.now()}
+const fmt = n => n < 1e4 ? '' + n : (n / 1000).toFixed(1) + 'k';
+const pctx = $('plot').getContext('2d');
+function hud() {
+  const [name, colr] = phase();
+  $('ph').textContent = name;$('dot').style.background = colr;$('dot').style.color = colr;
+  const a = 100 * pop / (N * N);
+  $('cnt').textContent = `gen ${fmt(gen)} · alive ${a < 10 ? a.toFixed(1) : Math.round(a)}% · ${kin} kin`;
+  if (calm === 8 && settledAt < 0 && !paused && pop) {settledAt = gen;say(`${name} by generation ${fmt(gen)}`)}
+  if (performance.now() - lastSay > 4000) $('ev').classList.remove('on');
+  const w = 340, h = 80;
+  pctx.clearRect(0, 0, w, h);
+  const line = (k, top, col) => {
+    pctx.beginPath();
+    hist.forEach((p, i) => {const x = w - (hist.length - 1 - i) * 2, y = h - 3 - Math.min(1, p[k] / top) * (h - 6);i ? pctx.lineTo(x, y) : pctx.moveTo(x, y)});
+    pctx.strokeStyle = col;pctx.lineWidth = 2;pctx.stroke();
+  };
+  const top = Math.max(1, ...hist.map(p => Math.max(p.pop, p.act)));     // alive and changing share a scale, so their ratio shows
+  line('kin', 36, '#c48bff');line('act', top, '#3fb8a5');line('pop', top, '#ffd166');
+}
+
+// ---- controls ----
+let tool = 'draw', bsize = 10, hue = Math.random(), turn = 0;
+const pts = new Map();
+let mouse = null, pinch = null, hintGone = false;
+const tools = {draw: $('tDraw'), spray: $('tSpray'), erase: $('tErase'), stamp: $('tStamp'), pan: $('tPan')};
+function setTool(t) {tool = t;for (const k in tools) tools[k].setAttribute('aria-pressed', k === t);canvas.classList.toggle('pan', t === 'pan')}
+for (const k in tools) tools[k].onclick = () => setTool(k);
+for (const k in PATTERNS) $('pat').add(new Option(k, k));
+$('pat').onchange = () => setTool('stamp');
+const views = [$('v0'), $('v1')];
+function setView(v) {view = v;views.forEach((b, i) => b.setAttribute('aria-pressed', i === v))}
+views.forEach((b, i) => b.onclick = () => setView(i));
+function setPaused(v) {paused = v;$('pause').setAttribute('aria-pressed', v);$('pause').textContent = v ? 'play' : 'pause'}
+$('pause').onclick = () => setPaused(!paused);
+const one = () => {setPaused(true);step(1)};
+$('one').onclick = one;
+const SPEEDS = [1, 2, 4, 8, 15, 30, 60, 120, 240, 480];       // generations per second
+let rate = 60;
+$('spd').oninput = e => {rate = SPEEDS[+e.target.value]};rate = SPEEDS[+$('spd').value];
+const setNoise = v => {noise = v <= 0 ? 0 : 1e-7 * Math.pow(10, v / 100 * 4);stir()};      // log scale, up to one flip per thousand cells
+$('noise').oninput = e => setNoise(+e.target.value);
+const startOf = () => (PRESETS.find(p => mask(p[1]) === born && mask(p[2]) === surv) || [0, 0, 0, .35])[3];
+const soup = () => {const s = startOf();reset(s > 0 ? s : .35);say('new soup')};
+$('soup').onclick = soup;
+const clear = () => {reset(null);say('cleared')};
+$('clear').onclick = clear;
+// the rule panel
+PRESETS.forEach((p, i) => $('preset').add(new Option(`${p[0]}  B${p[1]}/S${p[2]}`, i)));
+$('preset').add(new Option('unnamed rule', -1));
+$('preset').onchange = e => {const p = PRESETS[+e.target.value];if (!p) return showRule();setRule(mask(p[1]), mask(p[2]));reset(p[3]);say(p[0])};
+for (const [row, isB] of [[$('bB'), true], [$('bS'), false]]) for (let k = 0; k < 9; k++) {
+  const b = document.createElement('button');
+  b.type = 'button';b.textContent = k;
+  if (isB && !k) {b.disabled = true;b.title = 'Birth from nothing would flash the whole grid, so it is left out'}
+  else {b.title = `${isB ? 'born' : 'stays'} with ${k} neighbour${k === 1 ? '' : 's'}`;b.onclick = () => isB ? setRule(born ^ 1 << k, surv) : setRule(born, surv ^ 1 << k)}
+  row.append(b);
+}
+$('mutate').onclick = mutate;$('back').onclick = back;
+$('tr').open = innerWidth > 640;
+
+const act_ = e => e.pointerType === 'mouse' && (e.button === 2 || e.button === 1) ? 'pan' : tool;
+const cellAt = (x, y) => {
+  const o = new Uint8Array(4);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, src.fbo);
+  gl.readPixels(wrap(Math.floor(x)), wrap(Math.floor(y)), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, o);
+  return o[0] > 127;
+};
+// queue the stroke from the pointer's last position to its new one
+function stroke(p, wx, wy) {
+  const cellwise = p.a === 'draw', f = v => cellwise ? Math.floor(v) + .5 : v;
+  const x0 = f(p.wx), y0 = f(p.wy);
+  strokes.push({x: wrap(x0), y: wrap(y0), dx: f(wx) - x0, dy: f(wy) - y0, r: cellwise ? .5 : bsize, mode: p.mode, hue, seed: p.seed});
+  p.wx = wx;p.wy = wy;
+}
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+canvas.addEventListener('pointerdown', e => {
+  canvas.setPointerCapture(e.pointerId);
+  if (!hintGone) {hintGone = true;$('hint').style.opacity = 0}
+  const a = act_(e), [wx, wy] = toWorld(e.clientX, e.clientY);
+  const p = {x: e.clientX, y: e.clientY, a, wx, wy, seed: Math.random() * 1e6 | 0, mode: 0};
+  pts.set(e.pointerId, p);
+  if (pts.size === 2) {strokes.length = 0;const [u, v] = [...pts.values()];pinch = {d: Math.hypot(u.x - v.x, u.y - v.y), x: (u.x + v.x) / 2, y: (u.y + v.y) / 2};return}
+  if (a === 'stamp') {stamp($('pat').value, wrap(wx), wrap(wy), turn++, hue = (hue + .381966) % 1);return}
+  if (a === 'pan') return;
+  paint();
+  // drawing on a live cell erases for the rest of the stroke; every new stroke starts a new colour
+  p.mode = a === 'erase' || (a === 'draw' && cellAt(wx, wy)) ? 3 : a === 'spray' ? 2 : 1;
+  if (p.mode !== 3) hue = (hue + .381966) % 1;
+  stroke(p, wx, wy);
+});
+canvas.addEventListener('pointermove', e => {
+  mouse = e.pointerType === 'mouse' ? [e.clientX, e.clientY] : null;
+  const p = pts.get(e.pointerId);
+  if (!p) return;
+  const dx = e.clientX - p.x, dy = e.clientY - p.y;
+  p.x = e.clientX;p.y = e.clientY;
+  if (pts.size === 2 && pinch) {
+    const [u, v] = [...pts.values()], d = Math.hypot(u.x - v.x, u.y - v.y), mx = (u.x + v.x) / 2, my = (u.y + v.y) / 2;
+    cx -= (mx - pinch.x) * dpr / zoom;cy += (my - pinch.y) * dpr / zoom;
+    zoomAt(mx, my, d / Math.max(1, pinch.d));
+    pinch = {d, x: mx, y: my};
+  } else if (p.a === 'pan') {cx -= dx * dpr / zoom;cy += dy * dpr / zoom}
+  else if (p.mode) stroke(p, ...toWorld(e.clientX, e.clientY));
+});
+const up = e => {pts.delete(e.pointerId);pinch = null;for (const p of pts.values()) p.mode = 0};
+canvas.addEventListener('pointerup', up);canvas.addEventListener('pointercancel', up);
+canvas.addEventListener('pointerleave', () => {mouse = null});
+canvas.addEventListener('wheel', e => {e.preventDefault();zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * (e.ctrlKey ? .01 : .0015)))}, {passive: false});
+addEventListener('keydown', e => {
+  if (/^(INPUT|SELECT)$/.test(e.target.tagName) || e.metaKey || e.ctrlKey || e.altKey) return;
+  const k = e.key.toLowerCase();
+  if (k === ' ') {if (e.target.tagName === 'BUTTON' || e.target.tagName === 'SUMMARY') return;setPaused(!paused);e.preventDefault()}
+  else if (k === 'p') setPaused(!paused); else if (k === '.') one();
+  else if (k === 'd') setTool('draw'); else if (k === 's') setTool('spray'); else if (k === 'e') setTool('erase'); else if (k === 't') setTool('stamp'); else if (k === 'm') setTool('pan');
+  else if (k === '1' || k === '2') setView(+k - 1);
+  else if (k === 'x') mutate(); else if (k === 'z') back();
+  else if (k === 'n') soup(); else if (k === 'c') clear();
+  else if (k === '[') bsize = Math.max(2, bsize / 1.25); else if (k === ']') bsize = Math.min(80, bsize * 1.25);
+  else if (k === 'r') {cx = cy = N / 2;zoom = home()}
+});
+addEventListener('resize', resize);
+
+// ---- loop ----
+let last = performance.now(), slow = 0, tick = 0, cap = 32, owed = 0;
+function loop(now) {
+  resize();
+  const dt = Math.min(100, now - last);last = now;
+  // keep the frame rate: drop generations when frames run long, give them back when there is room
+  if (dt > 26) {if (++slow > 4 && cap > 1) {cap = Math.max(1, cap >> 1);slow = 0}} else if (dt < 19 && cap < 32 && tick % 30 === 0) cap++;
+  paint();
+  if (!paused) {
+    owed = Math.min(owed + dt * rate / 1000, cap);
+    const n = Math.floor(owed);owed -= n;
+    step(n);
+  }
+  if (tick++ % 12 === 0) {
+    if (!paused) step((6 - gen % 6) % 6);      // count on multiples of six, so blinkers and pulsars read the same every time
+    count();hud();
+  }
+  const at = mouse && !pts.size ? toWorld(mouse[0], mouse[1]) : null;
+  draw(at && (tool === 'spray' || tool === 'erase') ? at : null, at && tool === 'draw' && zoom >= 4 ? at : null);
+  requestAnimationFrame(loop);
+}
+resize();
+const m = /^#?B(\d*)\/S(\d*)$/i.exec(decodeURIComponent(location.hash));
+if (m) {born = mask(m[1]) & ~1;surv = mask(m[2])}
+showRule();
+reset(startOf());
+setTimeout(() => {if (!hintGone) {hintGone = true;$('hint').style.opacity = 0}}, 16000);
+window.__life = {N, step, count, reset, stamp, strokes, setRule: s => {const r = /B(\d*)\/S(\d*)/i.exec(s);setRule(mask(r[1]), mask(r[2]))},
+  stats: () => ({gen, pop, alive: pop / (N * N), act, kin, phase: phase()[0]}), view: setView, pause: setPaused,
+  cam: (x, y, z) => {cx = x;cy = y;zoom = z * dpr}};
+requestAnimationFrame(loop);
+</script>

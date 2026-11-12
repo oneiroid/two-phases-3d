@@ -69,3 +69,28 @@ Every cell runs Gray-Scott reaction-diffusion. The feed rate belongs to the land
 ```
 NODE_PATH=$(npm root -g) npm run petri -- out run:20000 snap:life view:2 snap:land   # headless census and screenshots
 ```
+
+## Life Rules
+
+`life/` is a third piece: Conway's Game of Life and the rest of its family, in raw WebGL 2. Open `http://localhost:8080/life/` after `npm run serve`.
+
+The rule is two rows of switches, shown on the page. Count the live cells among a cell's eight neighbours: an empty cell is born when that count is lit in the first row, and a live cell stays when it is lit in the second row. `B3/S23` is Life. Nothing else acts on the cells. Colour is only a record: a newborn takes the colour of one parent, and a cell that has just changed is bright.
+
+| Input | Action |
+|---|---|
+| The switches, or `mutate` (X) and `back` (Z) | change the rule while it runs |
+| The rule list | load a known rule with a start that suits it |
+| Drag | draw cells (D), spray random cells (S), erase (E) |
+| `stamp` (T) | place a glider, spaceship, r-pentomino, acorn, glider gun or pulsar |
+| Right drag, two fingers, or the `move` tool | pan (the grid wraps) |
+| Wheel, pinch | zoom |
+| 1 / 2 | colour by lineage, or by age |
+| Space or P, and `.` | pause, and one generation |
+| [ and ] | brush size |
+| N, C, R | new soup, clear, reset the view |
+
+`noise` flips cells at random and is zero by default. `?n=1024` sets the grid size (default 512), and the rule is kept in the address as `#B3/S23`.
+
+```
+NODE_PATH=$(npm root -g) npm run life -- out n:512 fill:none stamp:r-pentomino,256,256 run:1103   # must print pop 116
+```

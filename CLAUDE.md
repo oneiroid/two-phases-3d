@@ -7,7 +7,7 @@ A 3D port of a 2D canvas piece ("Two Phases"). No framework and no build step fo
 - `src/sim.js` contains the simulation only (`export function createSim(N, hooks, opt)`). It has no DOM and no three.js, so it runs in Node.
 - `src/main.js` holds rendering (three.js), sound (Web Audio), controls, HUD and the frame loop. It reads the sim's typed arrays directly.
 - `src/style.css` is the HUD overlay.
-- `scripts/build.mjs` inlines everything into `dist/two-phases-3d.html` and `dist/artifact.html`.
+- `scripts/build.mjs` inlines everything into `dist/two-phases-3d.html` and `dist/artifact.html`, and builds `petri/` and `life/` the same way.
 - `tools/headless-sim.mjs` runs the physics without rendering and logs phase transitions, with D at the end of each growth phase and the depth of each revolution.
 - `tools/delay-sweep.mjs` is the Deus ex Futuro delay test (`npm run sweep`).
 - `tools/screenshot.mjs` serves the repo, opens it in headless Chromium (SwiftShader WebGL) and steps the sim through `window.__tp3d.sim` to reach a phase, then saves screenshots.
@@ -76,6 +76,17 @@ A separate piece: an evolving Gray-Scott automaton in raw WebGL 2, with no three
 - The display blends strain colours, never gene values, because averaging hues invents colours that are not there.
 - `tools/petri-shot.mjs` (`npm run petri`) is the regression check: it steps the dish headless, prints life, soil and the number of lineages, and saves screenshots. After a change to the sim, run 30 000 steps at the default 256 and check that `kinds` stays above about 10 and life stays between 20% and 60%.
 - The live page is https://claude.ai/artifact/6arLMAg2mTku3WRzQHjjZr. Republish `dist/petri-artifact.html` there after a change.
+
+## Life Rules (`life/`)
+
+A third piece, on the branch `claude/life-rules`: the Game of Life and its family (outer-totalistic rules on eight neighbours), in raw WebGL 2. It shares no code with `src/` or `petri/`. It was written because Petri had too many rules to read as a cellular automaton, so keep it to the one rule.
+
+- The rule is two bit masks over the neighbour count, `born` and `surv`. Birth on zero neighbours is disabled, because it makes the whole grid flash every generation.
+- State is one RGBA8 texture: `r` alive, `g` generations in the current state (capped at 255), `b` lineage hue. Age and hue never feed back into the rule. A newborn takes the hue of one live neighbour at random.
+- `noise` (random flips) is the only departure from the exact rule, and it is zero by default.
+- One shader does both a generation (`run` 1) and a brush stroke (`run` 0), so drawing while paused does not advance time. Stamps are written with `texSubImage2D`.
+- The page counts on generations that are multiples of six, so blinkers and pulsars give the same numbers every time. "settled" means population and change held steady for eight counts.
+- `tools/life-shot.mjs` (`npm run life`) is the regression check. After a change to the step shader: an r-pentomino on an empty 512 grid must have exactly 116 cells at generation 1103, and a glider must keep 5.
 
 ## Known gaps
 

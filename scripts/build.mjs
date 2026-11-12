@@ -1,4 +1,4 @@
-// Builds single-file versions of the page from index.html + src/.
+// Builds single-file versions of the page from index.html + src/, and of the stand-alone pieces in petri/ and life/.
 //   dist/two-phases-3d.html  standalone document, opens from disk (three.js still loads from jsDelivr)
 //   dist/artifact.html       the same page without <!doctype>/<html>/<head>/<body>, for publishing as a claude.ai Artifact
 // Usage: node scripts/build.mjs
@@ -36,17 +36,19 @@ const frag = html
 writeFileSync(join(root, 'dist/artifact.html'), frag);
 console.log('built dist/two-phases-3d.html (%d bytes), dist/artifact.html (%d bytes)', html.length, frag.length);
 
-// Petri (petri/): the same two outputs, dist/petri.html and dist/petri-artifact.html. It has no imports to strip.
-html = rd('petri/index.html');
-swap('<link rel="stylesheet" href="petri.css">', `<style>\n${rd('petri/petri.css')}</style>`);
-swap('<script type="module" src="petri.js"></script>', `<script type="module">\n${rd('petri/petri.js')}</script>`);
-writeFileSync(join(root, 'dist/petri.html'), html);
-const pfrag = html
-  .replace(/^<!doctype html>\s*/i, '')
-  .replace(/<html[^>]*>\s*/i, '').replace(/<\/html>\s*$/i, '')
-  .replace(/<head>\s*/i, '').replace(/<\/head>\s*/i, '')
-  .replace(/<body>\s*/i, '').replace(/<\/body>\s*/i, '')
-  .replace(/<meta charset="utf-8">\s*/i, '')
-  .replace(/<meta name="viewport"[^>]*>\s*/i, '');
-writeFileSync(join(root, 'dist/petri-artifact.html'), pfrag);
-console.log('built dist/petri.html (%d bytes), dist/petri-artifact.html (%d bytes)', html.length, pfrag.length);
+// The stand-alone pieces, each with the same two outputs: dist/<name>.html and dist/<name>-artifact.html. They have no imports to strip.
+for (const name of ['petri', 'life']) {
+  html = rd(`${name}/index.html`);
+  swap(`<link rel="stylesheet" href="${name}.css">`, `<style>\n${rd(`${name}/${name}.css`)}</style>`);
+  swap(`<script type="module" src="${name}.js"></script>`, `<script type="module">\n${rd(`${name}/${name}.js`)}</script>`);
+  writeFileSync(join(root, `dist/${name}.html`), html);
+  const part = html
+    .replace(/^<!doctype html>\s*/i, '')
+    .replace(/<html[^>]*>\s*/i, '').replace(/<\/html>\s*$/i, '')
+    .replace(/<head>\s*/i, '').replace(/<\/head>\s*/i, '')
+    .replace(/<body>\s*/i, '').replace(/<\/body>\s*/i, '')
+    .replace(/<meta charset="utf-8">\s*/i, '')
+    .replace(/<meta name="viewport"[^>]*>\s*/i, '');
+  writeFileSync(join(root, `dist/${name}-artifact.html`), part);
+  console.log('built dist/%s.html (%d bytes), dist/%s-artifact.html (%d bytes)', name, html.length, name, part.length);
+}

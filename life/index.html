@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Life Rules</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Martian+Mono:wght@300;500&display=swap">
+<link rel="stylesheet" href="life.css">
+</head>
+<body>
+<canvas id="c" tabindex="0" aria-label="Conway's Game of Life on a wrapping grid. Each cell is coloured by the lineage it descends from"></canvas>
+<div id="tl" class="hud">
+  <div class="name">Life</div>
+  <div class="phase"><span class="dot" id="dot"></span><span id="ph">soup</span></div>
+  <div id="cnt">&nbsp;</div>
+  <canvas id="plot" width="340" height="80" aria-hidden="true"></canvas>
+  <div class="key"><span class="k1">alive</span><span class="k2">changing</span><span class="k3">lineages</span></div>
+  <div id="ev">&nbsp;</div>
+</div>
+<details id="tr" class="hud">
+  <summary><span>rule</span><span id="rname">B3/S23</span></summary>
+  <select id="preset" aria-label="Known rules"></select>
+  <div class="row"><span class="lab" id="lb">born</span><span class="bits" id="bB" role="group" aria-labelledby="lb"></span></div>
+  <div class="row"><span class="lab" id="ls">stays</span><span class="bits" id="bS" role="group" aria-labelledby="ls"></span></div>
+  <p>Count the live cells among a cell's eight neighbours. An empty cell is <b>born</b> on a lit count. A live cell <b>stays</b> on a lit count and dies otherwise. That is the whole rule.</p>
+  <div class="row"><button id="mutate" type="button" title="Flip one switch at random (X)">mutate</button><button id="back" type="button" title="Return to the previous rule (Z)" disabled>back</button></div>
+</details>
+<div id="bar" class="hud">
+  <div class="grp" role="group" aria-label="Tool">
+    <button id="tDraw" type="button" aria-pressed="true" title="Draw single cells (D)">draw</button>
+    <button id="tSpray" type="button" aria-pressed="false" title="Spray random cells (S)">spray</button>
+    <button id="tErase" type="button" aria-pressed="false" title="Erase (E)">erase</button>
+    <button id="tStamp" type="button" aria-pressed="false" title="Place a pattern (T)">stamp</button>
+    <select id="pat" aria-label="Pattern to stamp"></select>
+    <button id="tPan" type="button" aria-pressed="false" title="Move around (right drag, or two fingers)">move</button>
+  </div>
+  <div class="grp" role="group" aria-label="Colour by">
+    <button id="v0" type="button" aria-pressed="true" title="Colour by lineage (1)">kin</button>
+    <button id="v1" type="button" aria-pressed="false" title="Colour by age (2)">age</button>
+  </div>
+  <div class="grp"><label for="spd">speed</label><input id="spd" type="range" min="0" max="9" step="1" value="6"><button id="pause" type="button" aria-pressed="false" title="Space">pause</button><button id="one" type="button" title="One generation (.)">step</button></div>
+  <div class="grp"><label for="noise" title="Random flips. At zero the rule is exact">noise</label><input id="noise" type="range" min="0" max="100" step="1" value="0"></div>
+  <div class="grp">
+    <button id="soup" type="button" title="Fill with random cells (N)">soup</button>
+    <button id="clear" type="button" title="Empty the grid (C)">clear</button>
+  </div>
+</div>
+<div id="hint"><b>wheel</b> or <b>pinch</b> to zoom in · <b>drag</b> to draw cells · <b>right drag</b> or <b>two fingers</b> to move · the switches top right are the rule</div>
+<div id="fail" hidden>This needs WebGL 2, and it could not start in this browser.</div>
+<script>setTimeout(()=>{if(!window.__life)document.getElementById('fail').hidden=false},6000);</script>
+<script type="module" src="life.js"></script>
+</body>
+</html>
