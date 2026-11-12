@@ -87,6 +87,8 @@ A third piece, on the branch `claude/life-rules`: the Game of Life and its famil
 - One shader does both a generation (`run` 1) and a brush stroke (`run` 0), so drawing while paused does not advance time. Stamps are written with `texSubImage2D`.
 - The page counts on generations that are multiples of six, so blinkers and pulsars give the same numbers every time. "settled" means population and change held steady for eight counts.
 - `tools/life-shot.mjs` (`npm run life`) is the regression check. After a change to the step shader: an r-pentomino on an empty 512 grid must have exactly 116 cells at generation 1103, and a glider must keep 5.
+- The live page is https://claude.ai/artifact/EzDio9Bk2dEDBgn9UR6BWc. Republish `dist/life-artifact.html` there after a change.
+- It has only been seen in headless SwiftShader, where a 512 grid runs at about 40 generations a second. Rules other than Life were checked by eye for a few hundred generations.
 
 ## Known gaps
 
