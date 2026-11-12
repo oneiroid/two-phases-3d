@@ -45,3 +45,27 @@ NODE_PATH=$(npm root -g) node tools/screenshot.mjs out until:1 wait:700 snap:col
 ```
 
 `npm run sim -- 80 480 0.42 6 0.8` takes nodes, seconds, gravity scale, max link degree and container scale.
+
+## Petri
+
+`petri/` is a second piece in the same repo: a cellular automaton with heredity, in raw WebGL 2 (no three.js). Open `http://localhost:8080/petri/` after `npm run serve`.
+
+Every cell runs Gray-Scott reaction-diffusion. The feed rate belongs to the land, as a rainfall map that drifts over the torus, so each region grows its own body plan: waves in the dry, then spots, worms and mazes toward the wet. Each bit of life carries two genes that travel with it and mutate: its lineage (the hue) and its greed (how low its kill rate is). Soil remembers which lineage spent it and sickens that lineage there. A dense bloom therefore crashes on its own ground and another lineage takes the land, while sparse life can settle. That is the two-phase idea carried over from Two Phases: growth regulated late, ending in collapse or in consolidation.
+
+| Input | Action |
+|---|---|
+| Drag | paint the lineage chosen on the gene map (`seed`), or erase (`wipe`) |
+| Click the gene map | choose the lineage and greed to paint |
+| Alt-click, or the `pick` tool | take the strain under the cursor |
+| Right drag, two fingers, or the `move` tool | pan (the world wraps) |
+| Wheel, pinch | zoom |
+| 1 / 2 / 3 | life, genes, land (rainfall, and spent soil in the colour of who spent it) |
+| P or Space | pause |
+| [ and ] | brush size |
+| C, N, R | cataclysm, new dish, reset the view |
+
+`?n=256` (or 1024) sets the world size; the default is 512. An empty dish is reseeded.
+
+```
+NODE_PATH=$(npm root -g) npm run petri -- out run:20000 snap:life view:2 snap:land   # headless census and screenshots
+```

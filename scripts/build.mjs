@@ -35,3 +35,18 @@ const frag = html
   .replace(/<meta name="viewport"[^>]*>\s*/i, '');
 writeFileSync(join(root, 'dist/artifact.html'), frag);
 console.log('built dist/two-phases-3d.html (%d bytes), dist/artifact.html (%d bytes)', html.length, frag.length);
+
+// Petri (petri/): the same two outputs, dist/petri.html and dist/petri-artifact.html. It has no imports to strip.
+html = rd('petri/index.html');
+swap('<link rel="stylesheet" href="petri.css">', `<style>\n${rd('petri/petri.css')}</style>`);
+swap('<script type="module" src="petri.js"></script>', `<script type="module">\n${rd('petri/petri.js')}</script>`);
+writeFileSync(join(root, 'dist/petri.html'), html);
+const pfrag = html
+  .replace(/^<!doctype html>\s*/i, '')
+  .replace(/<html[^>]*>\s*/i, '').replace(/<\/html>\s*$/i, '')
+  .replace(/<head>\s*/i, '').replace(/<\/head>\s*/i, '')
+  .replace(/<body>\s*/i, '').replace(/<\/body>\s*/i, '')
+  .replace(/<meta charset="utf-8">\s*/i, '')
+  .replace(/<meta name="viewport"[^>]*>\s*/i, '');
+writeFileSync(join(root, 'dist/petri-artifact.html'), pfrag);
+console.log('built dist/petri.html (%d bytes), dist/petri-artifact.html (%d bytes)', html.length, pfrag.length);

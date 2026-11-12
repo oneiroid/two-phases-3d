@@ -65,8 +65,21 @@ These are Claude Docs docs, edited through the Claude Docs connector, not by pub
 - Two Phases 3D: Link Rules, https://claude.ai/artifact/VHHuAyxi5KFVopZnsiLSe6. The published copy of the rules file. It points to the Deus ex Futuro doc for the delay-test results instead of repeating the table.
 - Deus ex Futuro: Core Beliefs and the Dynamics of Transition, https://claude.ai/code/artifact/bc68a28d-1108-4411-bb46-ff3c73e643ee. This is the source of the two-phase law the sim follows. Section 9 holds the delay-test chart.
 
+## Petri (`petri/`)
+
+A separate piece: an evolving Gray-Scott automaton in raw WebGL 2, with no three.js and no shared code with `src/`. `petri/index.html` loads `petri.css` and `petri.js`. `npm run build` also writes `dist/petri.html` and `dist/petri-artifact.html`.
+
+- State is two RGBA32F textures, stepped by one fragment shader into two render targets. A holds `U` food, `V` life, `S` soil, `T` trail. B holds the lineage gene (a hue, circular), the greed gene, and `own`, a vector on the hue circle that records which lineage spent the soil.
+- The feed rate is not a gene. It comes from `rain(u)`, a drifting map (`P.year` steps per turn). The kill rate is `kMid(f) + (greed − 0.5)·KW`, which follows the patterned band of Gray-Scott. An earlier version made feed and kill the genes: the strain that survives on the least food (lowest feed + kill) always swept the dish, and below f ≈ 0.024 the travelling-wave strains overran everything. Do not move form back into the genes without a mechanism that counters this.
+- Inheritance is particulate: each step a cell takes the genes of one source of its `V`, chosen in proportion to the matter received, with the resident weighted fourfold. Blending genes instead dilutes every mutant.
+- Diversity is kept by soil sickness: on spent soil (`1 − S` past 0.25) the kill rate of the lineage that spent it rises by up to `kP`, falling off with hue distance (`kin`). Without it one lineage sweeps within a few thousand steps.
+- The display blends strain colours, never gene values, because averaging hues invents colours that are not there.
+- `tools/petri-shot.mjs` (`npm run petri`) is the regression check: it steps the dish headless, prints life, soil and the number of lineages, and saves screenshots. After a change to the sim, run 30 000 steps at the default 256 and check that `kinds` stays above about 10 and life stays between 20% and 60%.
+- The live page is https://claude.ai/artifact/6arLMAg2mTku3WRzQHjjZr. Republish `dist/petri-artifact.html` there after a change.
+
 ## Known gaps
 
 - Visual checks so far have been headless SwiftShader screenshots only, not a real GPU.
 - The force loop is O(n²) per substep, with up to 24 substeps at high time rates. It runs at about 1 ms per step for N = 80 in Node.
 - The on-screen hint names mouse controls on touch screens too.
+- Petri has only been seen in headless SwiftShader, and its long-run behaviour is checked to 30 000 steps on a 256 dish. The greed gene drifts slowly toward greedy; what happens far beyond that is not tested.
